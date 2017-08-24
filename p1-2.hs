@@ -30,20 +30,93 @@ expr' = do char '+'
 
 ------ Ejercicio 5 ------
 
-type H = Either Int Char
-type HL = [H] 
+type Heter = Either Int Char
+type HList = [Heter] 
 
 
-helem :: Parser H
-helem = 
+helem :: Parser Heter
+helem = do i <- int
+           return (Left i)
+          <|> do c <- letter
+                 return (Right c)
 
-hlist :: Parser HL
+helem' :: Parser Heter
+helem' = do char ','
+            h <- helem
+            return h
+
+
+hlist :: Parser HList
 hlist = do char '['
-           (do i <- int
-               xs <- hlist
-               return ((Left i):xs)
-              <|> do c <- char
-                     xs <- hlist
-                     return ((Right c):xs))
-          <|> return []
-                     
+           c <- helem
+           cs <- many helem'
+           char ']'
+           return (c:cs)
+
+
+
+------ Ejercicio 6 ------
+{-
+data Basetype = DInt | DChar | DFloat deriving Show
+type Hasktype = [Basetype]
+
+
+bt :: Parser Basetype
+bt = do string "Int"
+        return DInt
+       <|> do string "Char"
+              return DChar
+          <|> do string "Float"
+                 return DFloat
+
+
+ht' :: Parser Basetype
+ht' = do string " -> "
+         b <- bt
+         return b
+
+
+ht :: Parser Hasktype
+ht = do b <- bt
+        bs <- many ht'
+        return (b:bs)
+-}
+
+
+------ Ejercicio 7 ------
+
+data Hasktype = DInt | DChar | Fun Hasktype Hasktype
+                deriving Show
+
+
+bt :: Parser Hasktype
+bt = do string "Int"
+        return DInt
+       <|> do string "Char"
+              return DChar
+
+
+ht :: Parser Hasktype
+ht = do b <- bt
+        string " -> "
+        bs <- ht
+        return (Fun b bs)
+       <|> do b <- bt
+              return b
+
+
+
+------ Ejercicio 9 ------
+{-
+float :: Parser Float
+float = do i <- int
+
+constant_expression :: Parser 
+
+
+type_specifier :: Parser Char
+type_specifier = do (string "int"
+                   <|> string "char"
+                   <|> string "float")
+-}
+
