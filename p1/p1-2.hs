@@ -107,16 +107,62 @@ ht = do b <- bt
 
 
 ------ Ejercicio 9 ------
-{-
-float :: Parser Float
-float = do i <- int
 
-constant_expression :: Parser 
+data CType = CInt | CFloat | CChar | ListOf CType | PointerTo CType
+             deriving Show
 
 
-type_specifier :: Parser Char
-type_specifier = do (string "int"
-                   <|> string "char"
-                   <|> string "float")
--}
+
+constant_expression :: Parser Int
+constant_expression = int 
+
+
+type_specifier :: Parser CType
+type_specifier = do string "int"
+                    return CInt
+                   <|> do string "char"
+                          return CChar
+                         <|> do string "float"
+                                return CFloat
+
+
+name :: Parser String
+name = do c <- alphanum
+          cs <- name
+          return (c:cs)
+         <|> return []
+
+
+direct_declarator :: CType -> Parser (String,CType)
+direct_declarator t = do char '('
+                         dd <- direct_declarator t
+                         char ')'
+                         return dd
+                        <|> do n <- name
+                               d <- direct_declarator' t
+                               return (n,d)
+
+
+direct_declarator' :: CType -> Parser CType
+direct_declarator' t = do char '['
+                          constant_expression
+                          char ']'
+                          direct_declarator' (ListOf t)
+                         <|> do return t
+
+
+declarator :: CType -> Parser (String,CType)
+declarator t = do char '*'
+                  (n,t') <- declarator t
+                  return (n, PointerTo t')
+                 <|> do dd <- direct_declarator t
+                        return dd
+
+
+declaration :: Parser (String,CType)
+declaration = do t <- type_specifier
+                 char ' '
+                 d <- declarator t
+                 char ';'
+                 return d
 
