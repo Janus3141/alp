@@ -8,7 +8,8 @@ if ~ (t = n) then
 		i := i + 1
 	else
 		skip
-  until t = n
+    end
+  until t = n end
 else
   skip
 end

@@ -21,7 +21,7 @@ lis = makeTokenParser (emptyDef   { commentStart  = "/*"
                                   , commentLine   = "//"
                                   , opLetter      = char '='
                                   , reservedNames = ["true","false","skip","if",
-                                                     "then","else","end", "while","do"]
+                                                     "then","else","end", "repeat","until"]
                                   })
   
 ----------------------------------
@@ -104,9 +104,11 @@ boolexp2 :: Parser BoolExp
 boolexp2 = chainl1 boolexp3 andOp
 
 boolexp3 :: Parser BoolExp
-boolexp3 = parens lis boolexp <|> baseBool <|> do reservedOp lis "~"
-                                                  boole <- boolexp3
-                                                  return (Not boole)
+boolexp3 = parens lis boolexp
+         <|> baseBool
+         <|> do reservedOp lis "~"
+                boole <- boolexp3
+                return (Not boole)
 
 -----------------------------------
 --- Parser de comandos
@@ -118,29 +120,30 @@ seqComm = do reservedOp lis ";"
 
 
 comm :: Parser Comm
-comm = chainl comm2 seqComm
+comm = chainl1 comm2 seqComm
 
 
 comm2 :: Parser Comm
 comm2 = do var <- identifier lis
-          reservedOp lis ":="
-          n <- intexp
-          return (Let var n)
-     <|> do reserved lis "if"
-            b <- boolexp
-            reserved lis "then"
-            c1 <- comm
-            reserved lis "else"
-            c2 <- comm
-            reserved lis "end"
-            return (Cond b c1 c2)
-     <|> do reserved lis "repeat"
-            c <- comm
-            reserved lis "until"
-            b <- boolexp
-            reserved lis "end"
-            return (Repeat c b)
-     <|> do reserved lis "skip"
+           reservedOp lis ":="
+           n <- intexp
+           return (Let var n)
+      <|> do reserved lis "if"
+             b <- boolexp
+             reserved lis "then"
+             c1 <- comm
+             reserved lis "else"
+             c2 <- comm
+             reserved lis "end"
+             return (Cond b c1 c2)
+      <|> do reserved lis "repeat"
+             c <- comm
+             reserved lis "until"
+             b <- boolexp
+             reserved lis "end"
+             return (Repeat c b)
+      <|> do reserved lis "skip"
+             return Skip
 
 
 ------------------------------------
@@ -148,3 +151,4 @@ comm2 = do var <- identifier lis
 ------------------------------------
 parseComm :: SourceName -> String -> Either ParseError Comm
 parseComm = parse (totParser comm)
+
