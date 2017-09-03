@@ -4,7 +4,7 @@ import System.Environment (getArgs)
 import Parser (parseComm)
 
 -- Modificar este import para usar diferentes evaluadores
-import Eval1
+import Eval2
 ---------------------------------------------------------
 
 main :: IO ()
@@ -18,6 +18,8 @@ run ifile =
     s <- readFile ifile
     case parseComm ifile s of
       Left error -> print error
-      Right t    -> print (eval t) --imprimir el resultado de evaluar.
+      Right t    -> case eval t of
+                        Right st -> print st
+                        Left err -> print "Error"
 --      Right t    -> print t        --imprimir sin evaluar (para testear Parser)
       
