@@ -93,6 +93,7 @@ evalBoolExp exp st = case exp of
                                 Left err -> Left err
 
 
+-- Funciones auxiliares
 app :: (a -> State -> Either Err b) -> (b -> b -> c) -> a -> a -> State -> Either Err c
 app eval f a b st = let e1 = eval a st
                         e2 = eval b st
