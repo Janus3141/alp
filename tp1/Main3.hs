@@ -19,7 +19,7 @@ run ifile =
     case parseComm ifile s of
       Left error -> print error
       Right t    -> case eval t of
-                     (Right st,t) -> print (st,t)
-                     (Left err,t) -> print (err,t)
+                     (Right st,t) -> print t
+                     (Left err,t) -> print t
 --      Right t    -> print t        --imprimir sin evaluar (para testear Parser)
       

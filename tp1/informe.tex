@@ -1,0 +1,524 @@
+
+\documentclass[12pt,a4paper]{article}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{float}
+\renewcommand{\baselinestretch}{1}
+\usepackage[margin=2cm]{geometry}
+\usepackage{proof}
+\usepackage{amssymb}
+\usepackage{lscape}
+
+\setlength{\parindent}{0in}
+
+\begin{document}
+
+
+\begin{titlepage}
+\centering
+\begin{figure}[H]
+    \begin{center}
+        \includegraphics[width=2cm,height=2cm]{UNR_logo.jpg}
+    \end{center}
+\end{figure}
+{\scshape\large Facultad de Ciencias Exactas, Ingenier\'ia y Agrimensura\\*
+                 Licenciatura en Ciencias de la Computaci\'on\par}
+\vspace{3cm}
+{\scshape\LARGE An\'alisis de Lenguajes de Programaci\'on\par}
+{\huge\bfseries Trabajo Pr\'actico 1\par}
+\vspace{3cm}
+{\Large Sotelo, Bruno\par}
+\vfill
+{\large 14 / 06 / 2017 \par}
+\end{titlepage}
+
+\section*{Ejercicio 1}
+Para el operador ternario, en la sintaxis abstracta de LIS se puede
+agregar la siguiente regla a su gram\'atica correspondiente:
+$$ intexp\;::=\;boolexp\:?\:intexp:intexp $$
+Para extender la sintaxis concreta se puede agregar la regla:
+$$ intexp\;::=\;boolexp\:'?'\:intexp\:\:':'\:intexp $$
+
+\section*{Ejercicio 2}
+Se extiende la sintaxis abstracta de LIS en Haskell agregando al
+tipo $IntExp$ el constructor:
+$$ Choice\;\:BoolExp\;\:IntExp\;\:IntExp $$
+
+\section*{Ejercicio 3}
+\begin{verbatim}
+----------------------------------
+--- intexp: Parser de expressiones enteras
+-----------------------------------
+
+divmul :: Parser (IntExp -> IntExp -> IntExp)
+divmul = do reservedOp lis "*"
+            return Times
+       <|> do reservedOp lis "/"
+              return Div
+
+
+ressum :: Parser (IntExp -> IntExp -> IntExp)
+ressum = do reservedOp lis "+"
+            return Plus
+       <|> do reservedOp lis "-"
+              return Minus
+
+
+baseExp :: Parser IntExp
+baseExp = do n <- natural lis
+             return (Const n)
+        <|> do n <- identifier lis
+               return (Var n)
+
+
+intexp :: Parser IntExp
+intexp = chainl1 term ressum 
+
+term :: Parser IntExp
+term = chainl1 factor divmul
+
+factor :: Parser IntExp
+factor = parens lis intexp
+       <|> baseExp
+       <|> do reservedOp lis "-"
+              fac <- factor
+              return (UMinus fac)
+
+-----------------------------------
+--- boolexp: Parser de expressiones booleanas
+------------------------------------
+
+compOp :: Parser (IntExp -> IntExp -> BoolExp)
+compOp = do reservedOp lis "="
+            return Eq
+       <|> do reservedOp lis "<"
+              return Lt
+       <|> do reservedOp lis ">"
+              return Gt
+
+
+orOp :: Parser (BoolExp -> BoolExp -> BoolExp)
+orOp = do reservedOp lis "|"
+          return Or
+
+
+andOp :: Parser (BoolExp -> BoolExp -> BoolExp)
+andOp = do reservedOp lis "&"
+           return And
+
+
+baseBool :: Parser BoolExp
+baseBool = do reserved lis "true"
+              return BTrue
+         <|> do reserved lis "false"
+                return BFalse
+         <|> do exp1 <- intexp
+                op <- compOp
+                exp2 <- intexp
+                return (op exp1 exp2)
+
+
+boolexp :: Parser BoolExp
+boolexp = chainl1 boolexp2 orOp
+
+boolexp2 :: Parser BoolExp
+boolexp2 = chainl1 boolexp3 andOp
+
+\end{verbatim}
+\newpage
+\begin{verbatim}
+boolexp3 :: Parser BoolExp
+boolexp3 = parens lis boolexp
+         <|> baseBool
+         <|> do reservedOp lis "~"
+                boole <- boolexp3
+                return (Not boole)
+
+-----------------------------------
+--- comm: Parser de comandos
+-----------------------------------
+
+seqComm :: Parser (Comm -> Comm -> Comm)
+seqComm = do reservedOp lis ";"
+             return Seq
+
+
+comm :: Parser Comm
+comm = chainl1 comm2 seqComm
+
+
+comm2 :: Parser Comm
+comm2 = do var <- identifier lis
+           reservedOp lis ":="
+           n <- intexp
+           return (Let var n)
+      <|> do reserved lis "if"
+             b <- boolexp
+             reserved lis "then"
+             c1 <- comm
+             reserved lis "else"
+             c2 <- comm
+             reserved lis "end"
+             return (Cond b c1 c2)
+      <|> do reserved lis "repeat"
+             c <- comm
+             reserved lis "until"
+             b <- boolexp
+             reserved lis "end"
+             return (Repeat c b)
+      <|> do reserved lis "skip"
+             return Skip
+
+\end{verbatim}
+
+
+\section*{Ejercicio 4}
+Se a\~naden las siguientes metarreglas para la evaluaci\'on del
+operador ternario:
+$$ \infer[\mathrm{Tern_{1}}]
+         {\langle p_{0} ?\; e_{0}:e_{1}, \sigma \rangle \Downarrow_{intexp} n_{0}}
+         {\langle p_{0}, \sigma \rangle \Downarrow_{boolexp} \textbf{true} &
+          \langle e_{0}, \sigma \rangle \Downarrow_{intexp} n_{0}} $$
+$$ \infer[\mathrm{Tern_{2}}]
+         {\langle p_{0} ?\; e_{0}:e_{1}, \sigma \rangle \Downarrow_{intexp} n_{1}}
+         {\langle p_{0}, \sigma \rangle \Downarrow_{boolexp} \textbf{false} &
+          \langle e_{1}, \sigma \rangle \Downarrow_{intexp} n_{1}} $$
+
+
+\section*{Ejercicio 5}
+\textbf{La relaci\'on de evaluaci\'on de un paso
+$\rightsquigarrow$ es determinista}
+Hay que probar: Si $\langle c, \sigma \rangle \rightsquigarrow
+\langle c', \sigma' \rangle$ y $\langle c, \sigma \rangle \rightsquigarrow
+\langle c'', \sigma'' \rangle$ entonces
+$\langle c', \sigma' \rangle = \langle c'', \sigma'' \rangle$. \\*
+Prueba por inducci\'on en $\langle c, \sigma \rangle \rightsquigarrow
+\langle c', \sigma' \rangle$:
+\begin{itemize}
+\item Si para la derivaci\'on se us\'o como regla $\mathrm{Seq_{1}}$
+    entonces $c = skip; c'$. Para la derivaci\'on $\langle c,\sigma
+    \rangle \rightsquigarrow \langle c'',\sigma'' \rangle$ no se
+    pudo haber usado $\mathrm{Seq_{2}}$ ya que implicar\'ia que
+    existe $c_{0}$ tal que $\langle skip,\sigma \rangle \rightsquigarrow
+    \langle c_{0},\sigma'' \rangle$, pero no existe regla que se pueda
+    aplicar a $\langle skip, \sigma \rangle$ para obtener esa evaluaci\'on. 
+    La \'unica regla que se pudo haber usado es $\mathrm{Seq_{1}}$,
+    entonces $\langle c',\sigma' \rangle = \langle c'',\sigma'' \rangle$.
+\item Si se us\'o la regla $\mathrm{Repeat}$ entonces $c = \textbf{repeat}
+    \;c_{0}\;\textbf{until}\;b$. Observemos que no existe otra regla que evalue
+    el comando $\textbf{repeat}$, por lo tanto $\langle c,\sigma \rangle
+    \rightsquigarrow \langle c'',\sigma'' \rangle$ se deriv\'o tambi\'en
+    usando $\mathrm{Repeat}$. Entonces $\langle c',\sigma' \rangle =
+    \langle c'',\sigma'' \rangle$.
+\end{itemize}
+Para el paso inductivo, consideramos $\rightsquigarrow$, $\Downarrow_{intexp}$
+y $\Downarrow_{boolexp}$ determinista para las evaluaciones anteriores en los
+\'arboles de derivaci\'on, entonces:
+\begin{itemize}
+\item Si para la derivaci\'on se us\'o como regla $\mathrm{ASS}$ entonces
+    $c = (v := e, \sigma)$, $c' = \textbf{skip}$, $\langle e, \sigma
+    \rangle \Downarrow_{intexp} n$ y $\sigma' = [\sigma | v : n]$. Por la
+    forma de $c$, la \'unica regla que se le puede aplicar es
+    $\mathrm{Ass}$. Adem\'as, como $\Downarrow_{intexp}$ es
+    determinista, si $\langle e, \sigma \rangle \Downarrow_{intexp} n'$
+    entonces $ n = n' $. Por lo tanto la derivaci\'on $\langle c, \sigma
+    \rangle \rightsquigarrow \langle c'', \sigma'' \rangle$ tuvo que
+    haber sido
+    $$ \infer[\mathrm{Ass}]
+             {\langle v := e, \sigma \rangle \rightsquigarrow
+              \langle \textbf{skip}, [\sigma | v : n] \rangle} 
+             {\langle e, \sigma \rangle \Downarrow_{intexp} n} $$
+    Por lo tanto $\langle c', \sigma' \rangle = \langle c'', \sigma''
+    \rangle $
+\item Si se us\'o $\mathrm{If_{1}}$ entonces $c = \textbf{if}\;b\;
+    \textbf{then}\;c_{0}\;\textbf{else}\;c_{1}$ y $\langle b,\sigma
+    \rangle \Downarrow_{boolexp} \textbf{true}$. Para conseguir $\langle
+    c,\sigma \rangle \rightsquigarrow \langle c'',\sigma'' \rangle$ no
+    se pudo haber usado $\mathrm{If_{2}}$ porque implicar\'ia $\langle
+    b,\sigma \rangle \Downarrow_{boolexp} \textbf{false}$, pero sabemos
+    que $\langle b,\sigma \rangle \Downarrow_{boolexp} \textbf{true}$
+    y $\Downarrow_{boolexp}$ es determinista. Por lo tanto $\langle
+    c,\sigma \rangle \rightsquigarrow \langle c'',\sigma'' \rangle$
+    se obtuvo por $\mathrm{If_{1}}$. Luego $\langle c',\sigma' \rangle
+    = \langle c'',\sigma'' \rangle $.
+\item Similar si se us\'o $\mathrm{If_{2}}$ para obtener $\langle c,
+    \sigma \rangle \rightsquigarrow \langle c',\sigma' \rangle$.
+\item Si se us\'o $\mathrm{Seq_{2}}$ como regla, entonces $c = c_{0};
+    c_{1}$, y existe $c'_{0}$ tal que $\langle c_{0},\sigma \rangle
+    \rightsquigarrow \langle c'_{0},\sigma' \rangle$. Para obtener
+    $\langle c,\sigma \rangle \rightsquigarrow \langle c'',\sigma''
+    \rangle$ no se pudo haber utilizado $\mathrm{Seq_{1}}$ ya que,
+    si ese fuera el caso, $c_{0} = \textbf{skip}$, y por lo dicho
+    existe $c'_{0}$ tal que $\langle \textbf{skip},\sigma \rangle
+    \rightsquigarrow \langle c'_{0},\sigma' \rangle $, pero no existe
+    regla que pueda utilizarse para inferir esto. Por lo tanto para
+    obtener $\langle c,\sigma \rangle \rightsquigarrow \langle c'',
+    \sigma'' \rangle$ se utiliz\'o $\mathrm{Seq_{2}}$. La derivaci\'on
+    fue de la forma:
+    $$ \infer[\mathrm{Seq_{2}}]
+             {\langle c_{0};c_{1}, \sigma \rightsquigarrow
+              \langle c''_{0}; c_{1}, \sigma'' \rangle} 
+             {\langle c_{0},\sigma \rangle \rightsquigarrow
+              \langle c''_{0},\sigma'' \rangle}$$
+    Pero, por Hip\'otesis Inductiva, si $\langle c_{0},\sigma \rangle
+    \rightsquigarrow \langle c'_{0},\sigma' \rangle $ y $\langle
+    c_{0},\sigma \rangle \rightsquigarrow \langle c''_{0},\sigma''
+    \rangle $ entonces $\langle c'_{0},\sigma' \rangle = \langle
+    c''_{0},\sigma'' \rangle$. Como $c' = c'_{0};c_{1}$ y $c'' =
+    c''_{0};c_{1}$, entonces $c' = c''$, y tenemos $\sigma' = \sigma''$.
+    Por lo tanto $\langle c',\sigma' \rangle = \langle c'',\sigma''
+    \rangle$.
+\end{itemize}
+Por Ppio. de inducci\'on, $\rightsquigarrow$ es determinante.
+
+\newpage
+              
+\begin{landscape}
+\section*{Ejercicio 6}
+$$ \infer[\mathrm{Seq_{2}}]
+         {\langle x := x+1;\:\textbf{if}\;x>0\;\textbf{then\;skip\;else\;}
+          x := x-1, [\sigma\:|\:x:0] \rangle \\* \rightsquigarrow \langle
+          \textbf{skip};\:\textbf{if}\;x>0\;\textbf{then\;skip\;else}\;
+          x := x-1, [\sigma\:|\:x:1] \rangle}
+         {\infer[\mathrm{Ass}]
+                {\langle x := x+1, [\sigma\:|\:x:0] \rangle \rightsquigarrow
+                 \langle \textbf{skip}, [\sigma\:|\:x:1] \rangle}
+                {\infer[\mathrm{Plus}]
+                       {\langle x+1, [\sigma\:|\:x:0] \rangle
+                        \Downarrow_{intexp} 1}
+                       {\infer[\mathrm{Var}]
+                              {\langle x,[\sigma\:|\:x:0] \rangle
+                               \Downarrow_{intexp} 0}{}
+                        & \infer[\mathrm{NVal}]
+                                {\langle 1,[\sigma\:|\:x:0]
+                                 \Downarrow_{intexp} 1}{}}}}
+$$
+
+$$ \infer[\mathrm{Seq_{1}}]
+         {\langle \textbf{skip};\:\textbf{if}\;x>0\;\textbf{then\;skip\;
+          else}\;x := x-1, [\sigma\:|\:x:1] \rangle \rightsquigarrow
+          \langle \textbf{if}\;x>0\;\textbf{then\;skip\;else\;}
+          x := x-1, [\sigma\:|\:x:1] \rangle}
+         {}
+$$
+
+
+$$ \infer[\mathrm{If_{1}}]
+         {\langle \textbf{if}\;x > 0\;\textbf{then\;skip\;else}\;x := x-1,
+          [\sigma\:|\:x:1] \rangle \rightsquigarrow \langle \textbf{skip},
+          [\sigma\:|\:x:1] \rangle}
+         {\infer[\mathrm{Gt}]
+                {\langle x > 0, [\sigma\:|\:x:1] \rangle \Downarrow_{boolexp}
+                 \textbf{true}}
+                {\infer[\mathrm{Var}]
+                       {\langle x,[\sigma\:|\:x:1] \rangle
+                        \Downarrow_{intexp} 1}{}
+                 & \infer[\mathrm{NVal}]
+                         {\langle 0,[\sigma\:|\:x:1] \rangle
+                          \Downarrow_{intexp} 0}{}
+                }
+         }
+$$
+\\*
+De los tres \'arboles presentados arriba se puede deducir, usando la
+transitividad de $\rightsquigarrow^{*}$, que:
+$$ \langle x := x+1;\:\textbf{if}\;x>0\;\textbf{then\;skip\;else}\;
+  x := x - 1, [\sigma\:|\: x:0] \rangle \rightsquigarrow^{*} \langle
+  \textbf{skip}, [\sigma\:|\: x:1] \rangle
+$$
+\end{landscape}
+
+\newpage
+
+\section*{Ejercicio 7}
+\begin{verbatim}
+
+-- Estados
+type State = [(Variable,Integer)]
+
+-- Estado nulo
+initState :: State
+initState = []
+
+
+-- Busca el valor de una variabl en un estado
+lookfor :: Variable -> State -> Integer
+lookfor v ((name,value):st) = if name == v then value else lookfor v st
+
+
+-- Cambia el valor de una variable en un estado
+update :: Variable -> Integer -> State -> State
+update v value []               = [(v,value)]
+update v value ((v',value'):st) = if v' == v 
+                                  then ((v,value):st)
+                                  else ((v',value'):(update v value st))
+
+
+-- Evalua un programa en el estado nulo
+eval :: Comm -> State
+eval p = evalComm p initState
+
+
+-- Evalua un comando en un estado dado
+evalComm :: Comm -> State -> State
+evalComm com st = case com of
+                   Skip        -> st
+                   Let v exp   -> update v (evalIntExp exp st) st
+                   Seq c c'    -> let st' = evalComm c st
+                                  in evalComm c' st'
+                   Cond b c c' -> if evalBoolExp b st
+                                  then evalComm c st
+                                  else evalComm c' st
+                   Repeat c b  -> let st' = evalComm c st
+                                  in if evalBoolExp b st' then st'
+                                     else evalComm (Repeat c b) st'
+
+
+-- Evalua una expresion entera, sin efectos laterales
+evalIntExp :: IntExp -> State -> Integer
+evalIntExp exp st = case exp of
+                     Const n       -> n
+                     Var v         -> lookfor v st
+                     UMinus e      -> -(evalIntExp e st)
+                     Plus e e'     -> appInt (+) e e' st
+                     Minus e e'    -> appInt (-) e e' st
+                     Times e e'    -> appInt (*) e e' st
+                     Div e e'      -> appInt (div) e e' st
+
+
+-- Evalua una expresion entera, sin efectos laterales
+evalBoolExp :: BoolExp -> State -> Bool
+evalBoolExp exp st = case exp of
+                      BTrue -> True
+                      BFalse -> False
+                      Eq e e' -> appInt (==) e e' st
+                      Lt e e' -> appInt (<) e e' st
+                      Gt e e' -> appInt (>) e e' st
+                      And e e' -> appBool (&&) e e' st
+                      Or e e' -> appBool (||) e e' st
+                      Not e -> not (evalBoolExp e st)
+
+
+-- Funciones auxiliares
+app :: (a -> State -> b) -> (b -> b -> c) -> a -> a -> State -> c
+app eval f a b st = let exp1 = eval a st
+                        exp2 = eval b st
+                    in f exp1 exp2
+
+appInt = app evalIntExp
+appBool = app evalBoolExp
+\end{verbatim}
+
+\section{Ejercicio 8}
+\begin{verbatim}
+-- Estados
+type State = [(Variable,Integer)]
+
+-- Errores
+data Err = DivByZero | UndefVar
+
+-- Estado nulo
+initState :: State
+initState = []
+
+
+-- Busca el valor de una variabl en un estado
+lookfor :: Variable -> State -> Either Err Integer
+lookfor v []                = Left UndefVar
+lookfor v ((name,value):st) = if name == v
+                              then Right value
+                              else lookfor v st
+
+
+-- Cambia el valor de una variable en un estado
+update :: Variable -> Integer -> State -> State
+update v value []               = [(v,value)]
+update v value ((v',value'):st) = if v' == v 
+                                  then ((v,value):st)
+                                  else ((v',value'):(update v value st))
+
+
+-- Evalua un programa en el estado nulo
+eval :: Comm -> Either Err State
+eval p = evalComm p initState
+
+
+-- Evalua un comando en un estado dado
+evalComm :: Comm -> State -> Either Err State
+evalComm com st = case com of
+    Skip        -> Right st
+    Let v exp   -> case evalIntExp exp st of
+                    Right int -> Right (update v int st)
+                    Left err -> Left err
+    Seq c c'    -> let st' = evalComm c st
+                   in case st' of
+                       Right st'' -> evalComm c' st''
+                       Left err    -> Left err
+    Cond b c c' -> case evalBoolExp b st of
+                    Right b' -> if b' then evalComm c st
+                                else evalComm c' st
+                    Left err -> Left err
+    Repeat c b  -> case evalComm c st of
+                    Right st' -> case evalBoolExp b st' of
+                                  Right b' -> if b' then Right st'
+                                              else evalComm (Repeat c b) st'
+                                  Left err -> Left err
+                    Left err  -> Left err
+
+
+-- Evalua una expresion entera, sin efectos laterales
+evalIntExp :: IntExp -> State -> Either Err Integer
+evalIntExp exp st = case exp of
+    Const n       -> Right n
+    Var v         -> lookfor v st
+    UMinus e      -> case evalIntExp e st of
+                      Right n -> Right (-n)
+                      Left err -> Left err
+    Plus e e'     -> appInt (+) e e' st
+    Minus e e'    -> appInt (-) e e' st
+    Times e e'    -> appInt (*) e e' st
+    Div e e'      -> let n  = evalIntExp e st
+                         n' = evalIntExp e' st
+                     in case (n,n') of
+                         (Right v1, Right 0)  -> Left DivByZero
+                         (Right v1, Right v2) -> Right (div v1 v2)
+                         (Left err,_)         -> Left err
+                         (_,err)              -> err
+
+
+-- Evalua una expresion entera, sin efectos laterales
+evalBoolExp :: BoolExp -> State -> Either Err Bool
+evalBoolExp exp st = case exp of
+    BTrue -> Right True
+    BFalse -> Right False
+    Eq e e' -> appInt (==) e e' st 
+    Lt e e' -> appInt (<) e e' st 
+    Gt e e' -> appInt (>) e e' st 
+    And e e' -> appBool (&&) e e' st
+    Or e e' -> appBool (||) e e' st
+    Not e -> case evalBoolExp e st of
+              Right b -> Right (not b)
+              Left err -> Left err
+
+
+-- Funciones auxiliares
+app :: (a -> State -> Either Err b) -> (b -> b -> c)
+        -> a -> a -> State -> Either Err c
+app eval f a b st = let e1 = eval a st
+                        e2 = eval b st
+                    in case (e1,e2) of
+                        (Right v1, Right v2) -> Right (f v1 v2)
+                        (Left err,_)         -> Left err
+                        (_,Left err)         -> Left err
+
+appInt = app evalIntExp
+appBool = app evalBoolExp
+
+\end{verbatim}
+
+\section{Ejercicio 9}
+
+
+
+\end{document}
+
