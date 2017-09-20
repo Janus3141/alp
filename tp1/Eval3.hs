@@ -43,7 +43,7 @@ evalComm com st = case com of
     Let v exp   -> case evalIntExp exp st of
                     (Right int,t) -> (Right (update v int st),
                                       t++"-> Let "++v++" "++(show int)++" ")
-                     (Left err,t) -> (Left err,t)
+                    (Left err,t)  -> (Left err,t)
     Seq c c'    -> let (st',t) = evalComm c st
                    in case st' of
                        Right st'' -> let (res,t') = evalComm c' st''
