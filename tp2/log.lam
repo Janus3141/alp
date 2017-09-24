@@ -1,0 +1,7 @@
+
+def minus = \n m. m pred n
+
+def log2 = \n. (Y (\f p. (is0 (minus (mult 2 (snd p)) n ))
+                         (f (pair (suc (fst p)) (mult 2 (snd p))))
+                         (fst p)))
+
