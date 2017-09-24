@@ -12,29 +12,31 @@ import Common
 ----------------------------------------------
            
 
--- Busco la variable en la lista de variables ligadas, y devuelvo la distancia
--- a su ligadura si esta ligada, -1 caso contrario.
+-- Busco la variable en la lista de variables ligadas,
+-- y devuelvo la distancia a su ligadura si esta ligada,
+-- -1 caso contrario.
 searchFor :: Name -> [(Name,Int)] -> Int
 searchFor _ []           = -1
 searchFor var ((v,n):xs) = if var == v then n else searchFor var xs
 
--- Incremento la distancia de las variables a las ligaduras
-incAdd :: Name -> [(Name,Int)] -> [(Name,Int)]
-incAdd var []         = [(var,0)]
-incAdd var ((v,n):xs) = (v,n+1):(incAdd var xs)
+-- Agrego la variable 'var' e incremento la distancia de
+-- las variables a sus ligaduras
+addv :: Name -> [(Name,Int)] -> [(Name,Int)]
+addv var []         = [(var,0)]
+addv var ((v,n):xs) = (v,n+1):(incAdd var xs)
 
 
 conversion :: LamTerm -> Term
 conversion term = conv [] term
-                  where conv vars (LVar var)     = let n = searchFor var vars
-                                                   in if n >= 0
-                                                      then (Bound n)
-                                                      else (Free var)
-                        conv vars (App lam lam') = ((conv vars lam)
-                                                   :@:
-                                                   (conv vars lam'))
-                        conv vars (Abs var lam)  = let vars' = incAdd var vars
-                                                   in (Lam (conv vars' lam))
+              where conv vars (LVar var)     = let n = searchFor var vars
+                                               in if n >= 0
+                                                  then (Bound n)
+                                                  else (Free var)
+                    conv vars (App lam lam') = ((conv vars lam)
+                                                :@:
+                                                (conv vars lam'))
+                    conv vars (Abs var lam)  = let vars' = addv var vars
+                                               in (Lam (conv vars' lam))
 
 
   
@@ -65,12 +67,13 @@ subst (Lam t)    t' i = Lam (subst t (shift t' 1) (i+1))
 
 eval :: NameEnv Term -> Term -> Term
 eval env (Free var)  = case env of
-                         ((n,v):nvs) -> if n == var then v
+                         ((n,v):nvs) -> if n == var then --eval env v
                                         else eval nvs (Free var)
                          []          -> (Free var)
 eval env (Bound n)   = (Bound n)
 eval env (t1 :@: t2) = let t1' = eval env t1
                        in case t1' of
-                            (Lam t) -> eval env (shift (subst t (shift t2 1) 0) (-1))
-                            _       -> (t1' :@: (eval env t2))
+                           (Lam t) -> eval env (shift (subst t (shift t2 1) 0) (-1))
+                           _       -> (t1' :@: (eval env t2))
 eval env (Lam t)     = Lam (eval env t)
+
