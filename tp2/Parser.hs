@@ -15,7 +15,7 @@ module Parser where
 ----------------------------------------------
 
   num :: Integer -> LamTerm
-  num n = Abs "s z" (num' n)
+  num n = Abs "s" (Abs "z" (num' n))
           where num' 0 = LVar "z"
                 num' m = App (LVar "s") (num' (m-1))
 

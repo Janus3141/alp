@@ -1,16 +1,47 @@
-module Untyped where
 
-import Control.Monad
-import Data.List
+\documentclass[a4paper]{article}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{float}
+\renewcommand{\baselinestretch}{1}
+\usepackage[margin=2cm]{geometry}
 
-import Common
+\setlength{\parindent}{0in}
+
+\begin{document}
 
 
-----------------------------------------------
--- Seccón 2 - Representación de Términos Lambda 
--- Ejercicio 2: Conversión de Términos
-----------------------------------------------
-           
+\begin{titlepage}
+\centering
+\begin{figure}[H]
+    \begin{center}
+        \includegraphics[width=2cm,height=2cm]{UNR_logo.jpg}
+    \end{center}
+\end{figure}
+{\scshape\large Facultad de Ciencias Exactas, Ingenier\'ia y Agrimensura\\*
+                 Licenciatura en Ciencias de la Computaci\'on\par}
+\vspace{3cm}
+{\scshape\LARGE An\'alisis de Lenguajes de Programaci\'on\par}
+{\huge\bfseries Trabajo Pr\'actico 2\par}
+\vspace{3cm}
+{\Large Sotelo, Bruno\par}
+\vfill
+{\large 27 / 09 / 2017 \par}
+\end{titlepage}
+
+\section*{Ejercicio 1}
+\begin{verbatim}
+
+num :: Integer -> LamTerm
+num n = Abs "s" (Abs "z" (num' n))
+        where num' 0 = LVar "z"
+              num' m = App (LVar "s") (num' (m-1))
+
+\end{verbatim}
+
+
+\section*{Ejercicio 2}
+\begin{verbatim}
 
 -- Busco la variable en la lista de variables ligadas,
 -- y devuelvo la distancia a su ligadura si esta ligada,
@@ -37,11 +68,11 @@ conversion term = conv [] term
                     conv vars (Abs var lam)  = let vars' = incv vars
                                                in (Lam (conv ((var,0):vars') lam))
 
+\end{verbatim}
 
-  
--------------------------------
--- Sección 3 - Evaluación
--------------------------------
+
+\section*{Ejercicio 3}
+\begin{verbatim}
 
 shift :: Term -> Int -> Term
 shift term d = shift' term d 0
@@ -53,16 +84,27 @@ shift term d = shift' term d 0
                                               :@:
                                               (shift' l' d' c))
                      shift' (Lam l)    d' c = Lam (shift' l d' (c+1))
-  
-  
-  
+
+\end{verbatim}
+
+
+\newpage
+
+
+\section*{Ejercicio 4}
+\begin{verbatim}
+
 subst :: Term -> Term -> Int -> Term
 subst (Free var)  t i = (Free var)
 subst (Bound n)   t i = if n == i then t else (Bound n)
 subst (t1 :@: t2) t i = (subst t1 t i) :@: (subst t2 t i)
 subst (Lam t)    t' i = Lam (subst t (shift t' 1) (i+1))
 
+\end{verbatim}
 
+
+\section*{Ejercicio 5}
+\begin{verbatim}
 
 eval :: NameEnv Term -> Term -> Term
 eval env (Free var)  = case env of
@@ -75,4 +117,41 @@ eval env (t1 :@: t2) = let t1' = eval env t1
                            (Lam t) -> eval env (shift (subst t (shift t2 1) 0) (-1))
                            _       -> (t1' :@: (eval env t2))
 eval env (Lam t)     = Lam (eval env t)
+
+\end{verbatim}
+
+
+\section*{Ejercicio 6}
+
+La idea del algoritmo en Haskell:
+\begin{verbatim}
+
+log2' :: ((Int,Int),Int) -> Int
+log2' ((a,b),c) = if (c*2 - a) <= 0 then log2' ((a,b+1),c*2) else b
+
+log2 :: Int -> Int
+log2 x = log2' ((x,0),1)
+
+\end{verbatim}
+
+Y el algoritmo en lambda c\'alculo:
+
+\begin{verbatim}
+
+
+def minus = \n m. m pred n
+
+
+def log2' = Y (\f p. (is0 (minus (mult 2 (snd p)) (fst (fst p))))
+                     (f (pair (pair (fst (fst p)) (suc (snd (fst p)))) (mult 2 (snd p))))
+                     (snd (fst p)))
+
+
+def log2 = \n. log2' (pair (pair n zero) (suc (zero)))
+
+\end{verbatim}
+
+
+
+\end{document}
 
