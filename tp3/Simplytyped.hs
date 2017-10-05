@@ -53,19 +53,19 @@ eval e (Free n)              = fst $ fromJust $ lookup n e
 eval _ (Lam t u)             = VLam t u
 eval e (Lam _ u :@: Lam s v) = eval e (sub 0 (Lam s v) u)
 eval e (Lam _ u :@: TUnit)   = eval e (sub 0 (TUnit) u)
+eval e (Lam _ u :@: TPair f s) = eval e (sub 0 (TPair f s) u)
 eval e (Lam t u :@: v)       = case eval e v of
                  VLam t' u' -> eval e (Lam t u :@: Lam t' u')
                  VUnit      -> eval e (Lam t u :@: TUnit)
+                 VPair v v' -> eval e (Lam t u :@: (quote (VPair v v')))
                  _          -> error "Error de tipo en run-time, verificar type checker"
 eval e (u :@: v)             = case eval e u of
                  VLam t u' -> eval e (Lam t u' :@: v)
-                 VUnit     -> -- Si hago 'eval e (VUnit :@: v)' no llega a un valor, que hacer?
+                 --VUnit     -> -- Si hago 'eval e (VUnit :@: v)' no llega a un valor, que hacer?
                  _         -> error "Error de tipo en run-time, verificar type checker"
-eval e (Let u u')            = case eval e u of
-                 VLam t s  -> eval e (sub 0 (Lam t s) u')
-                 VUnit     -> eval e (sub 0 (TUnit) u')
-                 _         -> error "Error de tipo en run-time, verificar type checker"
-eval e (As u _)             = eval e u
+eval e (Let u u')            = let v = eval e u
+                               in eval e (sub 0 (quote v) u')
+eval e (As u _)              = eval e u
 eval _ (TUnit)               = VUnit
 eval e (TPair u v)           = let u' = eval e u
                                in VPair u' (eval e v)
@@ -83,7 +83,9 @@ eval e (Snd t)               = case eval e t of
 -----------------------
 
 quote :: Value -> Term
-quote (VLam t f) = Lam t f
+quote (VLam t f)   = Lam t f
+quote VUnit        = TUnit
+quote (VPair v v') = TPair (quote v) (quote v')
 
 ----------------------
 --- type checker
@@ -144,14 +146,14 @@ infer' c e (As u t) = infer' c e u >>= \tt ->
 infer' _ _ (TUnit) = ret Unit
 infer' c e (TPair t u) = infer' c e t >>= \tt ->
                          infer' c e u >>= \tu ->
-                         Pair tt tu
+                         ret $ Pair tt tu
 infer' c e (Fst t)    = infer' c e t >>= \tt ->
                         case tt of
-                          Pair tu _ -> tu
+                          Pair tu _ -> ret tu
                           _         -> notPairError tt
 infer' c e (Snd t)    = infer' c e t >>= \tt ->
                         case tt of
-                          Pair _ tu -> tu
+                          Pair _ tu -> ret tu
                           _         -> notPairError tt
 
 ----------------------------------

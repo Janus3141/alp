@@ -31,8 +31,8 @@ import Data.Char
     UNIT    { TokUnit }
     TUNIT   { TokTUnit }
     ','     { TComma }
-    FST     { TFst }
-    SND     { TSnd }
+    FST     { TokFst }
+    SND     { TokSnd }
     
 
 %right VAR
@@ -57,7 +57,6 @@ Exp     :: { LamTerm }
         | Exp AS Type                  { LtAs $1 $3 } --Ejercicio4
         | FST Exp                      { LtFst $2 } --Ejercicio8
         | SND Exp                      { LtSnd $2 } --Ejercicio8
-        | '(' Exp ',' Exp ')'          { LtPair $2 $4 } --Ejercicio8
         | NAbs                         { $1 }
         
 NAbs    :: { LamTerm }
@@ -67,12 +66,13 @@ NAbs    :: { LamTerm }
 Atom    :: { LamTerm }
         : UNIT                         { LtUnit } --Ejercicio6
         | VAR                          { LVar $1 }
+        | '(' Exp ',' Exp ')'          { LtPair $2 $4 } --Ejercicio8
         | '(' Exp ')'                  { $2 }
 
 Type    : TYPE                         { Base }
         | TUNIT                        { Unit }
         | Type '->' Type               { Fun $1 $3 }
-        | '(' Type , Type ')'          { Pair $2 $4 }
+        | '(' Type ',' Type ')'        { Pair $2 $4 }
         | '(' Type ')'                 { $2 }
 
 Defs    : Defexp Defs                  { $1 : $2 }
@@ -156,8 +156,8 @@ lexer cont s = case s of
                                            ("as",rest)   -> cont TAs rest --Ejercicio4
                                            ("unit",rest) -> cont TokUnit rest --Ejercicio6
                                            ("Unit",rest) -> cont TokTUnit rest
-                                           ("fst",rest)  -> cont TFst rest --Ejercicio8
-                                           ("snd",rest)  -> cont TSnd rest --Ejercicio8
+                                           ("fst",rest)  -> cont TokFst rest --Ejercicio8
+                                           ("snd",rest)  -> cont TokSnd rest --Ejercicio8
                                            (var,rest)    -> cont (TVar var) rest
                           consumirBK anidado cl cont s = case s of
                                                                       ('-':('-':cs)) -> consumirBK anidado cl cont $ dropWhile ((/=) '\n') cs

@@ -36,7 +36,7 @@ pp ii vs (As u t) = parens $ pp ii vs u <>
                     printType t
 pp ii vs (TUnit) = text "unit"
 pp ii vs (TPair t1 t2) = text "(" <> pp ii vs t1 <>
-                         text ", " <> pp ii vs t2 <>
+                         text "," <> pp ii vs t2 <>
                          text ")"
 pp ii vs (Fst t) = text "fst " <> pp ii vs t
 pp ii vs (Snd t) = text "snd " <> pp ii vs t
