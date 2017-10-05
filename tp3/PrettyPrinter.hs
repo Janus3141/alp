@@ -34,6 +34,7 @@ pp ii vs (LLet t1 t2) = sep [text "let " <> text (vs !! ii) <>
 pp ii vs (Tas u t) = parens $ pp ii vs u <>
                      text "as" <>
                      printType t
+pp ii vs (TUnit) = text "unit"
 
 isLam :: Term -> Bool
 isLam (Lam _ _) = True

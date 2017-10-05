@@ -28,8 +28,9 @@ module Common where
   data LamTerm  =  LVar String
                 |  Abs String Type LamTerm
                 |  App LamTerm LamTerm
-                |  Let String LamTerm LamTerm --__Ejercicio 3__
-                |  As LamTerm Type
+                |  Let String LamTerm LamTerm --Ejercicio 3
+                |  As LamTerm Type --Ejercicio4
+                |  LtUnit
                 deriving (Show, Eq)
 
 
@@ -38,7 +39,7 @@ module Common where
              | Free Name 
              | Term :@: Term
              | Lam Type Term
-             | LLet Term Term
+             | TLet Term Term
              | Tas Term Type
              | TUnit --Ejercicio6
           deriving (Show, Eq)

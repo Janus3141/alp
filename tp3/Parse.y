@@ -25,9 +25,10 @@ import Data.Char
     VAR     { TVar $$ }
     TYPE    { TType }
     DEF     { TDef }
-    LET     { TLet } --Ejercicio3
-    IN      { TIn } --Ejercicio3
-    AS      { TAs } --Ejercicio4
+    LET     { TyLet } --Ejercicio3
+    IN      { TyIn } --Ejercicio3
+    AS      { TyAs } --Ejercicio4
+    UNIT    { TyUnit } --Ejercicio6
     
 
 %right VAR
@@ -57,7 +58,8 @@ NAbs    :: { LamTerm }
         | Atom                         { $1 }
 
 Atom    :: { LamTerm }
-        : VAR                          { LVar $1 }
+        : UNIT                         { LtUnit } --Ejercicio6
+        | VAR                          { LVar $1 }
         | '(' Exp ')'                  { $2 }
 
 Type    : TYPE                         { Base }
@@ -107,9 +109,10 @@ data Token = TVar String
                | TArrow
                | TEquals
                | TEOF
-               | TLet --Ejercicio3
-               | TIn --Ejercicio3
-               | TAs --Ejercicio4
+               | TyLet --Ejercicio3
+               | TyIn --Ejercicio3
+               | TyAs --Ejercicio4
+               | TyUnit --Ejercicio6
                deriving Show
 
 ----------------------------------
@@ -132,12 +135,13 @@ lexer cont s = case s of
                     ('=':cs) -> cont TEquals cs
                     unknown -> \line -> Failed $ "Línea "++(show line)++": No se puede reconocer "++(show $ take 10 unknown)++ "..."
                     where lexVar cs = case span isAlpha cs of
-                                           ("B",rest)   -> cont TType rest
-                                           ("def",rest) -> cont TDef rest
-                                           ("let",rest) -> cont TLet rest --Ejercicio3
-                                           ("in",rest)  -> cont TIn rest --Ejercicio3
-                                           ("as",rest)  -> cont TAs rest --Ejercicio4
-                                           (var,rest)   -> cont (TVar var) rest
+                                           ("B",rest)    -> cont TType rest
+                                           ("def",rest)  -> cont TDef rest
+                                           ("let",rest)  -> cont TyLet rest --Ejercicio3
+                                           ("in",rest)   -> cont TyIn rest --Ejercicio3
+                                           ("as",rest)   -> cont TyAs rest --Ejercicio4
+                                           ("unit",rest) -> cont TyUnit rest --Ejercicio6
+                                           (var,rest)    -> cont (TVar var) rest
                           consumirBK anidado cl cont s = case s of
                                                                       ('-':('-':cs)) -> consumirBK anidado cl cont $ dropWhile ((/=) '\n') cs
 		                                                      ('{':('-':cs)) -> consumirBK (anidado+1) cl cont cs	

@@ -21,8 +21,9 @@ conversion' :: [String] -> LamTerm -> Term
 conversion' b (LVar n)     = maybe (Free (Global n)) Bound (n `elemIndex` b)
 conversion' b (App t u)    = conversion' b t :@: conversion' b u
 conversion' b (Abs n t u)  = Lam t (conversion' (n:b) u)
-conversion' b (Let n t t') = LLet (conversion' b t) (conversion' (n:b) t') --__Ejercicio 3__
-conversion' b (As l t)     = Tas (conversion' b l) t --__Ejercicio 4__
+conversion' b (Let n t t') = TLet (conversion' b t) (conversion' (n:b) t') --Ejercicio3
+conversion' b (As l t)     = Tas (conversion' b l) t --Ejercicio4
+conversion' b (LtUnit)     = TUnit --Ejercicio6
 
 -----------------------
 --- eval
@@ -34,7 +35,8 @@ sub _ _ (Bound j) | otherwise = Bound j
 sub _ _ (Free n)              = Free n
 sub i t (u :@: v)             = sub i t u :@: sub i t v
 sub i t (Lam t' u)            = Lam t' (sub (i+1) t u)
-sub i t (LLet t1 t2)          = LLet (sub i t t1) (sub (i+1) t t2) -- Aumentar i en sub t1?
+sub i t (TLet t1 t2)          = TLet (sub i t t1) (sub (i+1) t t2) -- Aumentar i en sub t1?
+sub _ _ (TUnit)               = TUnit
 
 -- evaluador de términos
 eval :: NameEnv Value Type -> Term -> Value
@@ -42,16 +44,21 @@ eval _ (Bound _)             = error "variable ligada inesperada en eval"
 eval e (Free n)              = fst $ fromJust $ lookup n e
 eval _ (Lam t u)             = VLam t u
 eval e (Lam _ u :@: Lam s v) = eval e (sub 0 (Lam s v) u)
+eval e (Lam _ u :@: TUnit)   = eval e (sub 0 (TUnit) u)
 eval e (Lam t u :@: v)       = case eval e v of
                  VLam t' u' -> eval e (Lam t u :@: Lam t' u')
+                 VUnit      -> eval e (Lam t u :@: TUnit)
                  _          -> error "Error de tipo en run-time, verificar type checker"
 eval e (u :@: v)             = case eval e u of
                  VLam t u' -> eval e (Lam t u' :@: v)
+                 VUnit     -> -- Si hago 'eval e (VUnit :@: v)' no llega a un valor, que hacer?
                  _         -> error "Error de tipo en run-time, verificar type checker"
-eval e (LLet u u')          = case eval e u of  --__Ejercicio 3__
+eval e (TLet u u')          = case eval e u of
                  VLam t s  -> eval e (sub 0 (Lam t s) u')
+                 VUnit     -> eval e (sub 0 (TUnit) u')
                  _         -> error "Error de tipo en run-time, verificar type checker"
-eval e (Tas u t)            = eval e u
+eval e (Tas u _)            = eval e u
+eval _ (TUnit)              = VUnit
 
 
 -----------------------
@@ -107,10 +114,11 @@ infer' c e (t :@: u) = infer' c e t >>= \tt ->
                          _         -> notfunError tt
 infer' c e (Lam t u) = infer' (t:c) e u >>= \tu ->
                        ret $ Fun t tu
-infer' c e (LLet t1 t2) = infer' c e t1 >>= \tt -> --__Ejercicio 3__
+infer' c e (TLet t1 t2) = infer' c e t1 >>= \tt -> --Ejercicio
                           infer' (tt:c) e t2
-infer' c e (Tas u t) = infer' c e u >>= \tt -> --__Ejercicio 4__
+infer' c e (Tas u t) = infer' c e u >>= \tt -> --Ejercicio4
                        if t == tt then ret t
                        else matchError t tt 
+infer' _ _ (TUnit) = ret Unit
 
 ----------------------------------
