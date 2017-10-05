@@ -29,6 +29,9 @@ import Data.Char
     IN      { TyIn } --Ejercicio3
     AS      { TyAs } --Ejercicio4
     UNIT    { TyUnit } --Ejercicio6
+    ','     { TComma } --Ejercicio8
+    FST     { TyFst } --Ejercicio8
+    SND     { TySnd } --Ejercicio8
     
 
 %right VAR
@@ -51,6 +54,9 @@ Exp     :: { LamTerm }
         : '\\' VAR ':' Type '.' Exp    { Abs $2 $4 $6 }
         | LET VAR '=' Exp IN Exp       { Let $2 $4 $6 } --Ejercicio3
         | Exp AS Type                  { As $1 $3 } --Ejercicio4
+        | FST Exp                      { LtFst $2 } --Ejercicio8
+        | SND Exp                      { LtSnd $2 } --Ejercicio8
+        | '(' Exp ',' Exp ')'          { LtPair $2 $4 } --Ejercicio8
         | NAbs                         { $1 }
         
 NAbs    :: { LamTerm }
@@ -113,6 +119,9 @@ data Token = TVar String
                | TyIn --Ejercicio3
                | TyAs --Ejercicio4
                | TyUnit --Ejercicio6
+               | TComma --Ejercicio8
+               | TyFst --Ejercicio8
+               | TySnd --Ejercicio8
                deriving Show
 
 ----------------------------------
@@ -133,6 +142,7 @@ lexer cont s = case s of
                     (')':cs) -> cont TClose cs
                     (':':cs) -> cont TColon cs
                     ('=':cs) -> cont TEquals cs
+                    (',':cs) -> cont TComma cs --Ejercicio8
                     unknown -> \line -> Failed $ "Línea "++(show line)++": No se puede reconocer "++(show $ take 10 unknown)++ "..."
                     where lexVar cs = case span isAlpha cs of
                                            ("B",rest)    -> cont TType rest
@@ -141,6 +151,8 @@ lexer cont s = case s of
                                            ("in",rest)   -> cont TyIn rest --Ejercicio3
                                            ("as",rest)   -> cont TyAs rest --Ejercicio4
                                            ("unit",rest) -> cont TyUnit rest --Ejercicio6
+                                           ("fst",rest)  -> cont TyFst rest --Ejercicio8
+                                           ("snd",rest)  -> cont TySnd rest --Ejercicio8
                                            (var,rest)    -> cont (TVar var) rest
                           consumirBK anidado cl cont s = case s of
                                                                       ('-':('-':cs)) -> consumirBK anidado cl cont $ dropWhile ((/=) '\n') cs

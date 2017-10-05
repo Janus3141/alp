@@ -22,8 +22,11 @@ conversion' b (LVar n)     = maybe (Free (Global n)) Bound (n `elemIndex` b)
 conversion' b (App t u)    = conversion' b t :@: conversion' b u
 conversion' b (Abs n t u)  = Lam t (conversion' (n:b) u)
 conversion' b (Let n t t') = TLet (conversion' b t) (conversion' (n:b) t') --Ejercicio3
-conversion' b (As l t)     = Tas (conversion' b l) t --Ejercicio4
-conversion' b (LtUnit)     = TUnit --Ejercicio6
+conversion' b (As l t)     = Tas (conversion' b l) t
+conversion' _ (LtUnit)     = TUnit
+conversion' b (LtPair t u) = TPair (conversion' b t) (conversion' b u)
+conversion' b (LtFst t)    = TFst (conversion' b t)
+conversion' b (LtSnd t)    = TSnd (conversion' b t)
 
 -----------------------
 --- eval
@@ -36,7 +39,12 @@ sub _ _ (Free n)              = Free n
 sub i t (u :@: v)             = sub i t u :@: sub i t v
 sub i t (Lam t' u)            = Lam t' (sub (i+1) t u)
 sub i t (TLet t1 t2)          = TLet (sub i t t1) (sub (i+1) t t2) -- Aumentar i en sub t1?
+sub i t (Tas u ty)            = Tas (sub i t u) ty
 sub _ _ (TUnit)               = TUnit
+sub i t (TPair u v)           = TPair (sub i t u) (sub i t v)
+sub i t (TFst u)              = TFst (sub i t u)
+sub i t (TSnd u)              = TSnd (sub i t u)
+
 
 -- evaluador de términos
 eval :: NameEnv Value Type -> Term -> Value
@@ -59,6 +67,14 @@ eval e (TLet u u')          = case eval e u of
                  _         -> error "Error de tipo en run-time, verificar type checker"
 eval e (Tas u _)            = eval e u
 eval _ (TUnit)              = VUnit
+eval e (TPair u v)          = VPair (eval e u) (eval e v)
+eval e (TFst t)             = case eval e t of
+                 VPair v _ -> v
+                 _         -> error "Error de tipo en run-time, verificar type checker"
+eval e (TSnd t)             = case eval e t of
+                 VPair _ v -> v
+                 _         -> error "Error de tipo en run-time, verificar type checker"
+
 
 
 -----------------------
@@ -97,6 +113,11 @@ matchError t1 t2 = err $ "se esperaba " ++
 notfunError :: Type -> Either String Type
 notfunError t1 = err $ render (printType t1) ++ " no puede ser aplicado."
 
+notPairError :: Type -> Either String Type
+notPairError t1 = err $ "se esperaba un tipo Pair, pero " ++
+                       render (printType t1) ++
+                       " fue inferido."
+
 notfoundError :: Name -> Either String Type
 notfoundError n = err $ show n ++ " no está definida."
 
@@ -114,11 +135,22 @@ infer' c e (t :@: u) = infer' c e t >>= \tt ->
                          _         -> notfunError tt
 infer' c e (Lam t u) = infer' (t:c) e u >>= \tu ->
                        ret $ Fun t tu
-infer' c e (TLet t1 t2) = infer' c e t1 >>= \tt -> --Ejercicio
+infer' c e (TLet t1 t2) = infer' c e t1 >>= \tt ->
                           infer' (tt:c) e t2
-infer' c e (Tas u t) = infer' c e u >>= \tt -> --Ejercicio4
+infer' c e (Tas u t) = infer' c e u >>= \tt ->
                        if t == tt then ret t
                        else matchError t tt 
 infer' _ _ (TUnit) = ret Unit
+infer' c e (TPair t u) = infer' c e t >>= \tt ->
+                         infer' c e u >>= \tu ->
+                         Pair tt tu
+infer' c e (TFst t)    = infer' c e t >>= \tt ->
+                         case tt of
+                          Pair tu _ -> tu
+                          _         -> notPairError tt
+infer' c e (TSnd t)    = infer' c e t >>= \tt ->
+                         case tt of
+                          Pair _ tu -> tu
+                          _         -> notPairError tt
 
 ----------------------------------

@@ -35,6 +35,11 @@ pp ii vs (Tas u t) = parens $ pp ii vs u <>
                      text "as" <>
                      printType t
 pp ii vs (TUnit) = text "unit"
+pp ii vs (TPair t1 t2) = text "(" <> pp ii vs t1 <>
+                         text ", " <> pp ii vs t2 <>
+                         text ")"
+pp ii vs (TFst t) = text "fst " <> pp ii vs t
+pp ii vs (TSnd t) = text "snd " <> pp ii vs t
 
 isLam :: Term -> Bool
 isLam (Lam _ _) = True
@@ -50,6 +55,8 @@ printType Base         = text "B"
 printType (Fun t1 t2)  = sep [ parensIf (isFun t1) (printType t1),
                                text "->",
                                printType t2]
+printType Unit         = text "Unit"
+
 isFun :: Type -> Bool
 isFun (Fun _ _)        = True
 isFun _                = False
@@ -59,6 +66,9 @@ fv (Bound _)         = []
 fv (Free (Global n)) = [n]
 fv (t :@: u)         = fv t ++ fv u
 fv (Lam _ u)         = fv u
+fv (TLet u u')       = fv u ++ fv u'
+fv (Tas u _)         = fv u
+fv (TUnit)           = []
 
 ---
 printTerm :: Term -> Doc
