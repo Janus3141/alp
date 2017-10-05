@@ -25,13 +25,14 @@ import Data.Char
     VAR     { TVar $$ }
     TYPE    { TType }
     DEF     { TDef }
-    LET     { TyLet } --Ejercicio3
-    IN      { TyIn } --Ejercicio3
-    AS      { TyAs } --Ejercicio4
-    UNIT    { TyUnit } --Ejercicio6
-    ','     { TComma } --Ejercicio8
-    FST     { TyFst } --Ejercicio8
-    SND     { TySnd } --Ejercicio8
+    LET     { TokLet }
+    IN      { TIn }
+    AS      { TAs }
+    UNIT    { TokUnit }
+    TUNIT   { TokTUnit }
+    ','     { TComma }
+    FST     { TFst }
+    SND     { TSnd }
     
 
 %right VAR
@@ -52,8 +53,8 @@ Defexp  : DEF VAR '=' Exp              { Def $2 $4 }
 
 Exp     :: { LamTerm }
         : '\\' VAR ':' Type '.' Exp    { Abs $2 $4 $6 }
-        | LET VAR '=' Exp IN Exp       { Let $2 $4 $6 } --Ejercicio3
-        | Exp AS Type                  { As $1 $3 } --Ejercicio4
+        | LET VAR '=' Exp IN Exp       { LtLet $2 $4 $6 } --Ejercicio3
+        | Exp AS Type                  { LtAs $1 $3 } --Ejercicio4
         | FST Exp                      { LtFst $2 } --Ejercicio8
         | SND Exp                      { LtSnd $2 } --Ejercicio8
         | '(' Exp ',' Exp ')'          { LtPair $2 $4 } --Ejercicio8
@@ -69,7 +70,9 @@ Atom    :: { LamTerm }
         | '(' Exp ')'                  { $2 }
 
 Type    : TYPE                         { Base }
+        | TUNIT                        { Unit }
         | Type '->' Type               { Fun $1 $3 }
+        | '(' Type , Type ')'          { Pair $2 $4 }
         | '(' Type ')'                 { $2 }
 
 Defs    : Defexp Defs                  { $1 : $2 }
@@ -115,13 +118,14 @@ data Token = TVar String
                | TArrow
                | TEquals
                | TEOF
-               | TyLet --Ejercicio3
-               | TyIn --Ejercicio3
-               | TyAs --Ejercicio4
-               | TyUnit --Ejercicio6
-               | TComma --Ejercicio8
-               | TyFst --Ejercicio8
-               | TySnd --Ejercicio8
+               | TokLet
+               | TIn
+               | TAs
+               | TokUnit
+               | TokTUnit
+               | TComma
+               | TokFst
+               | TokSnd
                deriving Show
 
 ----------------------------------
@@ -147,12 +151,13 @@ lexer cont s = case s of
                     where lexVar cs = case span isAlpha cs of
                                            ("B",rest)    -> cont TType rest
                                            ("def",rest)  -> cont TDef rest
-                                           ("let",rest)  -> cont TyLet rest --Ejercicio3
-                                           ("in",rest)   -> cont TyIn rest --Ejercicio3
-                                           ("as",rest)   -> cont TyAs rest --Ejercicio4
-                                           ("unit",rest) -> cont TyUnit rest --Ejercicio6
-                                           ("fst",rest)  -> cont TyFst rest --Ejercicio8
-                                           ("snd",rest)  -> cont TySnd rest --Ejercicio8
+                                           ("let",rest)  -> cont TokLet rest --Ejercicio3
+                                           ("in",rest)   -> cont TIn rest --Ejercicio3
+                                           ("as",rest)   -> cont TAs rest --Ejercicio4
+                                           ("unit",rest) -> cont TokUnit rest --Ejercicio6
+                                           ("Unit",rest) -> cont TokTUnit rest
+                                           ("fst",rest)  -> cont TFst rest --Ejercicio8
+                                           ("snd",rest)  -> cont TSnd rest --Ejercicio8
                                            (var,rest)    -> cont (TVar var) rest
                           consumirBK anidado cl cont s = case s of
                                                                       ('-':('-':cs)) -> consumirBK anidado cl cont $ dropWhile ((/=) '\n') cs

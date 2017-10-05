@@ -22,15 +22,14 @@ module Common where
             | Unit --Ejercicio6
             | Fun Type Type
             | Pair Type Type --Ejercicio8
-
             deriving (Show, Eq)
   
   -- Términos con nombres
   data LamTerm  =  LVar String
                 |  Abs String Type LamTerm
                 |  App LamTerm LamTerm
-                |  Let String LamTerm LamTerm --Ejercicio3
-                |  As LamTerm Type --Ejercicio4
+                |  LtLet String LamTerm LamTerm --Ejercicio3
+                |  LtAs LamTerm Type --Ejercicio4
                 |  LtUnit --Ejercicio6
                 |  LtFst LamTerm --Ejercicio8
                 |  LtSnd LamTerm --Ejercicio8
@@ -43,12 +42,12 @@ module Common where
              | Free Name 
              | Term :@: Term
              | Lam Type Term
-             | TLet Term Term --Ejercicio3
-             | Tas Term Type --Ejercicio4
+             | Let Term Term --Ejercicio3
+             | As Term Type --Ejercicio4
              | TUnit --Ejercicio6
              | TPair Term Term --Ejercicio8
-             | TFst Term --Ejercicio8
-             | TSnd Term --Ejercicio8
+             | Fst Term --Ejercicio8
+             | Snd Term --Ejercicio8
           deriving (Show, Eq)
 
   -- Valores

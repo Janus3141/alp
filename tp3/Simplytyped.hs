@@ -18,15 +18,15 @@ conversion :: LamTerm -> Term
 conversion = conversion' []
 
 conversion' :: [String] -> LamTerm -> Term
-conversion' b (LVar n)     = maybe (Free (Global n)) Bound (n `elemIndex` b)
-conversion' b (App t u)    = conversion' b t :@: conversion' b u
-conversion' b (Abs n t u)  = Lam t (conversion' (n:b) u)
-conversion' b (Let n t t') = TLet (conversion' b t) (conversion' (n:b) t') --Ejercicio3
-conversion' b (As l t)     = Tas (conversion' b l) t
-conversion' _ (LtUnit)     = TUnit
-conversion' b (LtPair t u) = TPair (conversion' b t) (conversion' b u)
-conversion' b (LtFst t)    = TFst (conversion' b t)
-conversion' b (LtSnd t)    = TSnd (conversion' b t)
+conversion' b (LVar n)       = maybe (Free (Global n)) Bound (n `elemIndex` b)
+conversion' b (App t u)      = conversion' b t :@: conversion' b u
+conversion' b (Abs n t u)    = Lam t (conversion' (n:b) u)
+conversion' b (LtLet n t t') = Let (conversion' b t) (conversion' (n:b) t')
+conversion' b (LtAs l t)     = As (conversion' b l) t
+conversion' _ (LtUnit)       = TUnit
+conversion' b (LtPair t u)   = TPair (conversion' b t) (conversion' b u)
+conversion' b (LtFst t)      = Fst (conversion' b t)
+conversion' b (LtSnd t)      = Snd (conversion' b t)
 
 -----------------------
 --- eval
@@ -38,12 +38,12 @@ sub _ _ (Bound j) | otherwise = Bound j
 sub _ _ (Free n)              = Free n
 sub i t (u :@: v)             = sub i t u :@: sub i t v
 sub i t (Lam t' u)            = Lam t' (sub (i+1) t u)
-sub i t (TLet t1 t2)          = TLet (sub i t t1) (sub (i+1) t t2) -- Aumentar i en sub t1?
-sub i t (Tas u ty)            = Tas (sub i t u) ty
+sub i t (Let t1 t2)           = Let (sub i t t1) (sub (i+1) t t2) -- Aumentar i en sub t1?
+sub i t (As u ty)             = As (sub i t u) ty
 sub _ _ (TUnit)               = TUnit
 sub i t (TPair u v)           = TPair (sub i t u) (sub i t v)
-sub i t (TFst u)              = TFst (sub i t u)
-sub i t (TSnd u)              = TSnd (sub i t u)
+sub i t (Fst u)               = Fst (sub i t u)
+sub i t (Snd u)               = Snd (sub i t u)
 
 
 -- evaluador de términos
@@ -61,17 +61,18 @@ eval e (u :@: v)             = case eval e u of
                  VLam t u' -> eval e (Lam t u' :@: v)
                  VUnit     -> -- Si hago 'eval e (VUnit :@: v)' no llega a un valor, que hacer?
                  _         -> error "Error de tipo en run-time, verificar type checker"
-eval e (TLet u u')          = case eval e u of
+eval e (Let u u')            = case eval e u of
                  VLam t s  -> eval e (sub 0 (Lam t s) u')
                  VUnit     -> eval e (sub 0 (TUnit) u')
                  _         -> error "Error de tipo en run-time, verificar type checker"
-eval e (Tas u _)            = eval e u
-eval _ (TUnit)              = VUnit
-eval e (TPair u v)          = VPair (eval e u) (eval e v)
-eval e (TFst t)             = case eval e t of
+eval e (As u _)             = eval e u
+eval _ (TUnit)               = VUnit
+eval e (TPair u v)           = let u' = eval e u
+                               in VPair u' (eval e v)
+eval e (Fst t)               = case eval e t of
                  VPair v _ -> v
                  _         -> error "Error de tipo en run-time, verificar type checker"
-eval e (TSnd t)             = case eval e t of
+eval e (Snd t)               = case eval e t of
                  VPair _ v -> v
                  _         -> error "Error de tipo en run-time, verificar type checker"
 
@@ -135,21 +136,21 @@ infer' c e (t :@: u) = infer' c e t >>= \tt ->
                          _         -> notfunError tt
 infer' c e (Lam t u) = infer' (t:c) e u >>= \tu ->
                        ret $ Fun t tu
-infer' c e (TLet t1 t2) = infer' c e t1 >>= \tt ->
-                          infer' (tt:c) e t2
-infer' c e (Tas u t) = infer' c e u >>= \tt ->
-                       if t == tt then ret t
-                       else matchError t tt 
+infer' c e (Let t1 t2) = infer' c e t1 >>= \tt ->
+                         infer' (tt:c) e t2
+infer' c e (As u t) = infer' c e u >>= \tt ->
+                      if t == tt then ret t
+                      else matchError t tt 
 infer' _ _ (TUnit) = ret Unit
 infer' c e (TPair t u) = infer' c e t >>= \tt ->
                          infer' c e u >>= \tu ->
                          Pair tt tu
-infer' c e (TFst t)    = infer' c e t >>= \tt ->
-                         case tt of
+infer' c e (Fst t)    = infer' c e t >>= \tt ->
+                        case tt of
                           Pair tu _ -> tu
                           _         -> notPairError tt
-infer' c e (TSnd t)    = infer' c e t >>= \tt ->
-                         case tt of
+infer' c e (Snd t)    = infer' c e t >>= \tt ->
+                        case tt of
                           Pair _ tu -> tu
                           _         -> notPairError tt
 
