@@ -33,6 +33,10 @@ import Data.Char
     ','     { TComma }
     FST     { TokFst }
     SND     { TokSnd }
+    REC     { TokRec }
+    SUC     { TokSuc }
+    ZERO    { TokZero }
+    NAT     { TokNat }
     
 
 %right VAR
@@ -41,7 +45,7 @@ import Data.Char
 %right '\\' '.' LET IN
 %left AS 
 %right REC
-%right SUC 
+%right SUC
 %right SND FST
 
 
@@ -53,10 +57,11 @@ Defexp  : DEF VAR '=' Exp              { Def $2 $4 }
 
 Exp     :: { LamTerm }
         : '\\' VAR ':' Type '.' Exp    { Abs $2 $4 $6 }
-        | LET VAR '=' Exp IN Exp       { LtLet $2 $4 $6 } --Ejercicio3
-        | Exp AS Type                  { LtAs $1 $3 } --Ejercicio4
-        | FST Exp                      { LtFst $2 } --Ejercicio8
-        | SND Exp                      { LtSnd $2 } --Ejercicio8
+        | LET VAR '=' Exp IN Exp       { LtLet $2 $4 $6 }
+        | Exp AS Type                  { LtAs $1 $3 }
+        | FST Exp                      { LtFst $2 }
+        | SND Exp                      { LtSnd $2 }
+        | REC Atom Atom Exp            { LtR $2 $3 $4 }
         | NAbs                         { $1 }
         
 NAbs    :: { LamTerm }
@@ -64,13 +69,16 @@ NAbs    :: { LamTerm }
         | Atom                         { $1 }
 
 Atom    :: { LamTerm }
-        : UNIT                         { LtUnit } --Ejercicio6
+        : UNIT                         { LtUnit }
+        | ZERO                         { LtZero }
+        | SUC Atom                     { LtSucc $2 }
         | VAR                          { LVar $1 }
-        | '(' Exp ',' Exp ')'          { LtPair $2 $4 } --Ejercicio8
+        | '(' Exp ',' Exp ')'          { LtPair $2 $4 }
         | '(' Exp ')'                  { $2 }
 
 Type    : TYPE                         { Base }
         | TUNIT                        { Unit }
+        | NAT                          { Nat }
         | Type '->' Type               { Fun $1 $3 }
         | '(' Type ',' Type ')'        { Pair $2 $4 }
         | '(' Type ')'                 { $2 }
@@ -126,6 +134,10 @@ data Token = TVar String
                | TComma
                | TokFst
                | TokSnd
+               | TokRec
+               | TokSuc
+               | TokZero
+               | TokNat
                deriving Show
 
 ----------------------------------
@@ -146,18 +158,22 @@ lexer cont s = case s of
                     (')':cs) -> cont TClose cs
                     (':':cs) -> cont TColon cs
                     ('=':cs) -> cont TEquals cs
-                    (',':cs) -> cont TComma cs --Ejercicio8
+                    (',':cs) -> cont TComma cs
+                    ('0':cs) -> cont TokZero cs
                     unknown -> \line -> Failed $ "Línea "++(show line)++": No se puede reconocer "++(show $ take 10 unknown)++ "..."
                     where lexVar cs = case span isAlpha cs of
                                            ("B",rest)    -> cont TType rest
+                                           ("R",rest)    -> cont TokRec rest
                                            ("def",rest)  -> cont TDef rest
-                                           ("let",rest)  -> cont TokLet rest --Ejercicio3
-                                           ("in",rest)   -> cont TIn rest --Ejercicio3
-                                           ("as",rest)   -> cont TAs rest --Ejercicio4
-                                           ("unit",rest) -> cont TokUnit rest --Ejercicio6
+                                           ("let",rest)  -> cont TokLet rest
+                                           ("in",rest)   -> cont TIn rest
+                                           ("as",rest)   -> cont TAs rest
+                                           ("unit",rest) -> cont TokUnit rest
                                            ("Unit",rest) -> cont TokTUnit rest
-                                           ("fst",rest)  -> cont TokFst rest --Ejercicio8
-                                           ("snd",rest)  -> cont TokSnd rest --Ejercicio8
+                                           ("fst",rest)  -> cont TokFst rest
+                                           ("snd",rest)  -> cont TokSnd rest
+                                           ("succ",rest) -> cont TokSuc rest
+                                           ("Nat",rest)  -> cont TokNat rest
                                            (var,rest)    -> cont (TVar var) rest
                           consumirBK anidado cl cont s = case s of
                                                                       ('-':('-':cs)) -> consumirBK anidado cl cont $ dropWhile ((/=) '\n') cs

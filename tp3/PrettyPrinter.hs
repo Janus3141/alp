@@ -34,12 +34,17 @@ pp ii vs (Let t1 t2) = sep [text "let " <> text (vs !! ii) <>
 pp ii vs (As u t) = parens $ pp ii vs u <>
                     text "as" <>
                     printType t
-pp ii vs (TUnit) = text "unit"
+pp _ _ (TUnit) = text "unit"
 pp ii vs (TPair t1 t2) = text "(" <> pp ii vs t1 <>
                          text "," <> pp ii vs t2 <>
                          text ")"
 pp ii vs (Fst t) = text "fst " <> pp ii vs t
 pp ii vs (Snd t) = text "snd " <> pp ii vs t
+pp _ _ Zero = text "0"
+pp ii vs (Succ t) = text "succ " <> pp ii vs t
+pp ii vs (R t1 t2 t3) = sep [text "R" <> parensIf (isLam t1 || isApp t1) (pp ii vs t1),
+                             parensIf (isLam t2 || isApp t2) (pp ii vs t2),
+                             parensIf (isLam t3 || isApp t3) (pp ii vs t3)]
 
 isLam :: Term -> Bool
 isLam (Lam _ _) = True
@@ -58,6 +63,7 @@ printType (Fun t1 t2)  = sep [ parensIf (isFun t1) (printType t1),
 printType Unit         = text "Unit"
 printType (Pair t1 t2) = sep [ text "(" <> printType t1, text ", ",
                                printType t2 <> text ")" ]
+printType Nat          = text "Nat"
 
 isFun :: Type -> Bool
 isFun (Fun _ _)        = True
@@ -74,6 +80,9 @@ fv (TUnit)           = []
 fv (TPair u u')      = fv u ++ fv u'
 fv (Fst u)           = fv u
 fv (Snd u)           = fv u
+fv Zero              = []
+fv (Succ n)          = fv n
+fv (R t1 t2 t3)      = fv t1 ++ fv t2 ++ fv t3
 
 ---
 printTerm :: Term -> Doc

@@ -19,21 +19,25 @@ module Common where
 
   -- Tipo de los tipos
   data Type = Base 
-            | Unit --Ejercicio6
+            | Unit
             | Fun Type Type
-            | Pair Type Type --Ejercicio8
+            | Pair Type Type
+            | Nat
             deriving (Show, Eq)
   
   -- Términos con nombres
   data LamTerm  =  LVar String
                 |  Abs String Type LamTerm
                 |  App LamTerm LamTerm
-                |  LtLet String LamTerm LamTerm --Ejercicio3
-                |  LtAs LamTerm Type --Ejercicio4
-                |  LtUnit --Ejercicio6
-                |  LtFst LamTerm --Ejercicio8
-                |  LtSnd LamTerm --Ejercicio8
-                |  LtPair LamTerm LamTerm --Ejercicio8
+                |  LtLet String LamTerm LamTerm
+                |  LtAs LamTerm Type
+                |  LtUnit
+                |  LtFst LamTerm
+                |  LtSnd LamTerm
+                |  LtPair LamTerm LamTerm
+                |  LtZero
+                |  LtSucc LamTerm
+                |  LtR LamTerm LamTerm LamTerm
                 deriving (Show, Eq)
 
 
@@ -42,18 +46,25 @@ module Common where
              | Free Name 
              | Term :@: Term
              | Lam Type Term
-             | Let Term Term --Ejercicio3
-             | As Term Type --Ejercicio4
-             | TUnit --Ejercicio6
-             | TPair Term Term --Ejercicio8
-             | Fst Term --Ejercicio8
-             | Snd Term --Ejercicio8
+             | Let Term Term
+             | As Term Type
+             | TUnit
+             | TPair Term Term
+             | Fst Term
+             | Snd Term
+             | Zero
+             | Succ Term
+             | R Term Term Term
           deriving (Show, Eq)
 
   -- Valores
   data Value = VLam Type Term 
              | VUnit 
-             | VPair Value Value --Ejercicio8
+             | VPair Value Value
+             | VN ValNum
+
+  data ValNum = VZero | VSucc ValNum
 
   -- Contextos del tipado
   type Context = [Type]
+
