@@ -29,7 +29,7 @@ pp ii vs (Lam t c) = text "\\" <>
                      text ". " <>
                      pp (ii+1) vs c
 pp ii vs (Let t1 t2) = sep [text "let " <> text (vs !! ii) <>
-                       text " = " <> parens (pp (ii+1) vs t1),
+                       text " = " <> parens (pp (ii) vs t1),
                        text " in " <> parens (pp (ii+1) vs t2)]
 pp ii vs (As u t) = parens $ pp ii vs u <>
                     text "as" <>
