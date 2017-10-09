@@ -7,6 +7,8 @@
 \usepackage[margin=2cm]{geometry}
 \usepackage{proof}
 \usepackage{amssymb}
+\usepackage{listings}
+\lstset{language=Haskell, basicstyle=\small}
 
 \setlength{\parindent}{0in}
 
@@ -199,8 +201,626 @@ $$ \infer[\textsc{T-Fst}]
         }
 $$
 
-                        
 
+
+
+\section*{C\'odigo final}
+\subsection*{Parse.y}
+
+\begin{lstlisting}
+{
+module Parse where
+import Common
+import Data.Maybe
+import Data.Char
+
+}
+
+%monad { P } { thenP } { returnP }
+%name parseStmt Def
+%name parseStmts Defs
+%name term Exp
+
+%tokentype { Token }
+%lexer {lexer} {TEOF}
+
+%token
+    '='     { TEquals }
+    ':'     { TColon }
+    '\\'    { TAbs }
+    '.'     { TDot }
+    '('     { TOpen }
+    ')'     { TClose }
+    '->'    { TArrow }
+    VAR     { TVar $$ }
+    TYPE    { TType }
+    DEF     { TDef }
+    LET     { TokLet }
+    IN      { TIn }
+    AS      { TAs }
+    UNIT    { TokUnit }
+    TUNIT   { TokTUnit }
+    ','     { TComma }
+    FST     { TokFst }
+    SND     { TokSnd }
+    REC     { TokRec }
+    SUC     { TokSuc }
+    ZERO    { TokZero }
+    NAT     { TokNat }
+    
+
+%right VAR
+%left '=' 
+%right '->'
+%right '\\' '.' LET IN
+%left AS 
+%right REC
+%right SUC
+%right SND FST
+
+
+%%
+
+Def     :  Defexp                      { $1 }
+        |  Exp                         { Eval $1 }
+Defexp  : DEF VAR '=' Exp              { Def $2 $4 } 
+
+Exp     :: { LamTerm }
+        : '\\' VAR ':' Type '.' Exp    { Abs $2 $4 $6 }
+        | LET VAR '=' Exp IN Exp       { LtLet $2 $4 $6 }
+        | Exp AS Type                  { LtAs $1 $3 }
+        | FST Exp                      { LtFst $2 }
+        | SND Exp                      { LtSnd $2 }
+        | REC Atom Atom Exp            { LtR $2 $3 $4 }
+        | NAbs                         { $1 }
+        
+NAbs    :: { LamTerm }
+        : NAbs Atom                    { App $1 $2 }
+        | Atom                         { $1 }
+
+Atom    :: { LamTerm }
+        : UNIT                         { LtUnit }
+        | ZERO                         { LtZero }
+        | SUC Atom                     { LtSucc $2 }
+        | VAR                          { LVar $1 }
+        | '(' Exp ',' Exp ')'          { LtPair $2 $4 }
+        | '(' Exp ')'                  { $2 }
+
+Type    : TYPE                         { Base }
+        | TUNIT                        { Unit }
+        | NAT                          { Nat }
+        | Type '->' Type               { Fun $1 $3 }
+        | '(' Type ',' Type ')'        { Pair $2 $4 }
+        | '(' Type ')'                 { $2 }
+
+Defs    : Defexp Defs                  { $1 : $2 }
+        |                              { [] }
+
+\end{lstlisting}
+\begin{lstlisting}
+
+
+{
+
+data ParseResult a = Ok a | Failed String
+                     deriving Show                     
+type LineNumber = Int
+type P a = String -> LineNumber -> ParseResult a
+
+getLineNo :: P LineNumber
+getLineNo = \s l -> Ok l
+
+thenP :: P a -> (a -> P b) -> P b
+m `thenP` k = \s l-> case m s l of
+                         Ok a     -> k a s l
+                         Failed e -> Failed e
+                         
+returnP :: a -> P a
+returnP a = \s l-> Ok a
+
+failP :: String -> P a
+failP err = \s l -> Failed err
+
+catchP :: P a -> (String -> P a) -> P a
+catchP m k = \s l -> case m s l of
+                        Ok a     -> Ok a
+                        Failed e -> k e s l
+
+happyError :: P a
+happyError = \ s i -> Failed $ "Linea "++
+              (show (i::LineNumber))++
+              ": Error de parseo\n"++(s)
+
+data Token = TVar String
+               | TType
+               | TDef
+               | TAbs
+               | TDot
+               | TOpen
+               | TClose 
+               | TColon
+               | TArrow
+               | TEquals
+               | TEOF
+               | TokLet
+               | TIn
+               | TAs
+               | TokUnit
+               | TokTUnit
+               | TComma
+               | TokFst
+               | TokSnd
+               | TokRec
+               | TokSuc
+               | TokZero
+               | TokNat
+               deriving Show
+
+\end{lstlisting}
+\pagebreak
+\begin{lstlisting}
+
+lexer cont s = case s of
+                    [] -> cont TEOF []
+                    ('\n':s)  ->  \line -> lexer cont s (line + 1)
+                    (c:cs)
+                          | isSpace c -> lexer cont cs
+                          | isAlpha c -> lexVar (c:cs)
+                    ('-':('-':cs)) -> lexer cont $ dropWhile ((/=) '\n') cs
+                    ('{':('-':cs)) -> consumirBK 0 0 cont cs  
+                    ('-':('}':cs)) -> \ line -> Failed $
+                                      "Linea "++(show line)++
+                                      ": Comentario no abierto"
+                    ('-':('>':cs)) -> cont TArrow cs
+                    ('\\':cs)-> cont TAbs cs
+                    ('.':cs) -> cont TDot cs
+                    ('(':cs) -> cont TOpen cs
+                    ('-':('>':cs)) -> cont TArrow cs
+                    (')':cs) -> cont TClose cs
+                    (':':cs) -> cont TColon cs
+                    ('=':cs) -> cont TEquals cs
+                    (',':cs) -> cont TComma cs
+                    ('0':cs) -> cont TokZero cs
+                    unknown -> \line -> Failed $ "Línea "++
+                                (show line)++": No se puede reconocer "
+                                ++(show $ take 10 unknown)++ "..."
+                    where lexVar cs = case span isAlpha cs of
+                                       ("B",rest)    -> cont TType rest
+                                       ("R",rest)    -> cont TokRec rest
+                                       ("def",rest)  -> cont TDef rest
+                                       ("let",rest)  -> cont TokLet rest
+                                       ("in",rest)   -> cont TIn rest
+                                       ("as",rest)   -> cont TAs rest
+                                       ("unit",rest) -> cont TokUnit rest
+                                       ("Unit",rest) -> cont TokTUnit rest
+                                       ("fst",rest)  -> cont TokFst rest
+                                       ("snd",rest)  -> cont TokSnd rest
+                                       ("succ",rest) -> cont TokSuc rest
+                                       ("Nat",rest)  -> cont TokNat rest
+                                       (var,rest)    -> cont (TVar var) rest
+                          consumirBK anidado cl cont s = case s of
+                                      ('-':('-':cs)) -> consumirBK anidado cl cont $
+                                                        dropWhile ((/=) '\n') cs
+                                      ('{':('-':cs)) -> consumirBK (anidado+1) cl cont cs 
+                                      ('-':('}':cs)) -> case anidado of
+                                                   0 -> \line -> lexer cont cs (line+cl)
+                                                   _ -> consumirBK (anidado-1) cl cont cs
+                                      ('\n':cs) -> consumirBK anidado (cl+1) cont cs
+                                      (_:cs) -> consumirBK anidado cl cont cs     
+                                           
+stmts_parse s = parseStmts s 1
+stmt_parse s = parseStmt s 1
+term_parse s = term s 1
+}
+
+\end{lstlisting}
+
+\pagebreak
+\subsection*{Common.hs}
+\begin{lstlisting}
+
+module Common where
+
+  -- Comandos interactivos o de archivos
+  data Stmt i = Def String i           --  Declarar un nuevo identificador x, let x = t
+              | Eval i                 --  Evaluar el término
+    deriving (Show)
+  
+  instance Functor Stmt where
+    fmap f (Def s i) = Def s (f i)
+    fmap f (Eval i)  = Eval (f i)
+
+  -- Tipos de los nombres
+  data Name
+     =  Global  String
+    deriving (Show, Eq)
+
+  -- Entornos
+  type NameEnv v t = [(Name, (v, t))]
+
+  -- Tipo de los tipos
+  data Type = Base 
+            | Unit
+            | Fun Type Type
+            | Pair Type Type
+            | Nat
+            deriving (Show, Eq)
+  
+  -- Términos con nombres
+  data LamTerm  =  LVar String
+                |  Abs String Type LamTerm
+                |  App LamTerm LamTerm
+                |  LtLet String LamTerm LamTerm
+                |  LtAs LamTerm Type
+                |  LtUnit
+                |  LtFst LamTerm
+                |  LtSnd LamTerm
+                |  LtPair LamTerm LamTerm
+                |  LtZero
+                |  LtSucc LamTerm
+                |  LtR LamTerm LamTerm LamTerm
+                deriving (Show, Eq)
+
+
+  -- Términos localmente sin nombres
+  data Term  = Bound Int
+             | Free Name 
+             | Term :@: Term
+             | Lam Type Term
+             | Let Term Term
+             | As Term Type
+             | TUnit
+             | TPair Term Term
+             | Fst Term
+             | Snd Term
+             | Zero
+             | Succ Term
+             | R Term Term Term
+          deriving (Show, Eq)
+
+
+\end{lstlisting}
+\pagebreak
+\begin{lstlisting}
+
+  -- Valores
+  data Value = VLam Type Term 
+             | VUnit 
+             | VPair Value Value
+             | VN ValNum
+
+  data ValNum = VZero | VSucc ValNum
+
+  -- Contextos del tipado
+  type Context = [Type]
+
+\end{lstlisting}
+
+\bigskip
+\bigskip
+\bigskip
+\noindent\rule{16cm}{0.4pt}
+\subsection*{Simplytyped.hs}
+\begin{lstlisting}
+
+module Simplytyped (
+       conversion,    -- conversion a terminos localmente sin nombre
+       eval,          -- evaluador
+       infer,         -- inferidor de tipos
+       quote          -- valores -> terminos
+       )
+       where
+
+import Data.List
+import Data.Maybe
+import Prelude hiding ((>>=))
+import Text.PrettyPrint.HughesPJ (render)
+import PrettyPrinter
+import Common
+
+-- conversion a términos localmente sin nombres
+conversion :: LamTerm -> Term
+conversion = conversion' []
+
+conversion' :: [String] -> LamTerm -> Term
+conversion' b (LVar n)       = maybe (Free (Global n)) Bound (n `elemIndex` b)
+conversion' b (App t u)      = conversion' b t :@: conversion' b u
+conversion' b (Abs n t u)    = Lam t (conversion' (n:b) u)
+conversion' b (LtLet n t t') = Let (conversion' b t) (conversion' (n:b) t')
+conversion' b (LtAs l t)     = As (conversion' b l) t
+conversion' _ (LtUnit)       = TUnit
+conversion' b (LtFst t)      = Fst (conversion' b t)
+conversion' b (LtSnd t)      = Snd (conversion' b t)
+conversion' b (LtPair t u)   = TPair (conversion' b t) (conversion' b u)
+conversion' _ (LtZero)       = Zero
+conversion' b (LtSucc t)     = Succ (conversion' b t)
+conversion' b (LtR t1 t2 t3) = let t1' = conversion' b t1
+                                   t2' = conversion' b t2
+                                   t3' = conversion' b t3
+                               in R t1' t2' t3'
+
+\end{lstlisting}
+\pagebreak
+\begin{lstlisting}
+
+-----------------------
+--- eval
+-----------------------
+
+sub :: Int -> Term -> Term -> Term
+sub i t (Bound j) | i == j    = t
+sub _ _ (Bound j) | otherwise = Bound j
+sub _ _ (Free n)              = Free n
+sub i t (u :@: v)             = sub i t u :@: sub i t v
+sub i t (Lam t' u)            = Lam t' (sub (i+1) t u)
+sub i t (Let t1 t2)           = Let (sub i t t1) (sub (i+1) t t2)
+sub i t (As u ty)             = As (sub i t u) ty
+sub _ _ (TUnit)               = TUnit
+sub i t (Fst u)               = Fst (sub i t u)
+sub i t (Snd u)               = Snd (sub i t u)
+sub i t (TPair u v)           = TPair (sub i t u) (sub i t v)
+sub _ _ (Zero)                = Zero
+sub i t (Succ u)              = Succ (sub i t u)
+sub i t (R u1 u2 u3)          = let u1' = sub i t u1
+                                    u2' = sub i t u2
+                                    u3' = sub i t u3
+                                in R u1' u2' u3'
+
+
+-- evaluador de términos
+eval :: NameEnv Value Type -> Term -> Value
+eval _ (Bound _)             = error "variable ligada inesperada en eval"
+eval e (Free n)              = fst $ fromJust $ lookup n e
+eval _ (Lam t u)             = VLam t u
+eval e (Lam _ u :@: v)       = let v' = eval e v
+                               in eval e (sub 0 (quote v') u)
+eval e (u :@: v)             = case eval e u of
+                 VLam t u' -> eval e (Lam t u' :@: v)
+                 _         -> error "Error de tipo en run-time, verificar type checker"
+eval e (Let u u')            = let v = eval e u
+                               in eval e (sub 0 (quote v) u')
+eval e (As u _)              = eval e u
+eval _ (TUnit)               = VUnit
+eval e (TPair u v)           = let u' = eval e u
+                               in VPair u' (eval e v)
+eval e (Fst t)               = case eval e t of
+                 VPair v _ -> v
+                 _         -> error "Error de tipo en run-time, verificar type checker"
+eval e (Snd t)               = case eval e t of
+                 VPair _ v -> v
+                 _         -> error "Error de tipo en run-time, verificar type checker"
+eval _ (Zero)                = VN VZero
+eval e (Succ n)              = let VN n' = eval e n
+                               in VN $ VSucc n'
+eval e (R t1 t2 t3)          = case eval e t3 of
+                 VN VZero     -> eval e t1
+                 VN (VSucc n) -> let n' = quote' n
+                                 in eval e $ (t2 :@: (R t1 t2 $ n')) :@: n'
+                 _            -> error "Error de tipo en run-time, verificar type checker"
+
+
+\end{lstlisting}
+\pagebreak
+\begin{lstlisting}
+
+
+-----------------------
+--- quoting
+-----------------------
+
+quote :: Value -> Term
+quote (VLam t f)   = Lam t f
+quote VUnit        = TUnit
+quote (VPair v v') = TPair (quote v) (quote v')
+quote (VN vn)      = quote' vn
+
+quote' :: ValNum -> Term
+quote' VZero     = Zero
+quote' (VSucc n) = Succ $ quote' n
+
+----------------------
+--- type checker
+-----------------------
+
+-- type checker
+infer :: NameEnv Value Type -> Term -> Either String Type
+infer = infer' []
+
+-- definiciones auxiliares
+ret :: Type -> Either String Type
+ret = Right
+
+err :: String -> Either String Type
+err = Left
+
+(>>=) :: Either String Type -> (Type -> Either String Type) -> Either String Type
+(>>=) v f = either Left f v
+-- fcs. de error
+
+matchError :: Type -> Type -> Either String Type
+matchError t1 t2 = err $ "se esperaba " ++
+                         render (printType t1) ++
+                         ", pero " ++
+                         render (printType t2) ++
+                         " fue inferido."
+
+notfunError :: Type -> Either String Type
+notfunError t1 = err $ render (printType t1) ++ " no puede ser aplicado."
+
+notPairError :: Type -> Either String Type
+notPairError t1 = err $ "se esperaba un tipo Pair, pero " ++
+                       render (printType t1) ++
+                       " fue inferido."
+
+notfoundError :: Name -> Either String Type
+notfoundError n = err $ show n ++ " no está definida."
+
+\end{lstlisting}
+\pagebreak
+\begin{lstlisting}
+
+infer' :: Context -> NameEnv Value Type -> Term -> Either String Type
+infer' c _ (Bound i) = ret (c !! i)
+infer' _ e (Free n) = case lookup n e of
+                        Nothing -> notfoundError n
+                        Just (_,t) -> ret t
+infer' c e (t :@: u) = infer' c e t >>= \tt ->
+                       infer' c e u >>= \tu ->
+                       case tt of
+                         Fun t1 t2 -> if (tu == t1)
+                                        then ret t2
+                                        else matchError t1 tu
+                         _         -> notfunError tt
+infer' c e (Lam t u)   = infer' (t:c) e u >>= \tu ->
+                         ret $ Fun t tu
+infer' c e (Let t1 t2) = infer' c e t1 >>= \tt ->
+                         infer' (tt:c) e t2
+infer' c e (As u t)    = infer' c e u >>= \tt ->
+                         if t == tt then ret t
+                         else matchError t tt 
+infer' _ _ TUnit       = ret Unit
+infer' c e (TPair t u) = infer' c e t >>= \tt ->
+                         infer' c e u >>= \tu ->
+                         ret $ Pair tt tu
+infer' c e (Fst t)    = infer' c e t >>= \tt ->
+                        case tt of
+                          Pair tu _ -> ret tu
+                          _         -> notPairError tt
+infer' c e (Snd t)    = infer' c e t >>= \tt ->
+                        case tt of
+                          Pair _ tu -> ret tu
+                          _         -> notPairError tt
+infer' c e Zero       = ret Nat
+infer' c e (Succ n)   = infer' c e n >>= \tt ->
+                        case tt of
+                          Nat -> ret Nat
+                          _   -> matchError Nat tt
+infer' c e (R t f n)  = infer' c e t >>= \tt ->
+                        infer' c e f >>= \tu ->
+                        if tu == Fun tt (Fun Nat tt) then
+                            case infer' c e n of
+                              Right Nat -> ret tt
+                              Right x   -> matchError Nat x
+                              Left x    -> err x
+                        else matchError (Fun tt (Fun Nat tt)) tu
+
+\end{lstlisting}
+
+\bigskip
+\bigskip
+\bigskip
+\noindent\rule{16cm}{0.4pt}
+\subsection*{PrettyPrinter.hs}
+\begin{lstlisting}
+
+module PrettyPrinter (
+       printTerm,     -- pretty printer para terminos
+       printType,     -- pretty printer para tipos
+       )
+       where
+
+import Common
+import Text.PrettyPrint.HughesPJ
+
+-- lista de posibles nombres para variables
+vars :: [String]
+vars = [ c : n | n <- "" : map show [(1::Integer)..], c <- ['x','y','z'] ++ ['a'..'w'] ]
+
+parensIf :: Bool -> Doc -> Doc
+parensIf True  = parens
+parensIf False = id
+
+-- pretty-printer de términos
+
+pp :: Int -> [String] -> Term -> Doc
+pp ii vs (Bound k)         = text (vs !! (ii - k - 1))
+pp _  _  (Free (Global s)) = text s
+pp ii vs (i :@: c) = sep [parensIf (isLam i) (pp ii vs i),
+                          nest 1 (parensIf (isLam c || isApp c) (pp ii vs c))]
+pp ii vs (Lam t c) = text "\\" <>
+                     text (vs !! ii) <>
+                     text ":" <>
+                     printType t <>
+                     text ". " <>
+                     pp (ii+1) vs c
+pp ii vs (Let t1 t2) = sep [text "let " <> text (vs !! ii) <>
+                       text " = " <> parens (pp (ii) vs t1),
+                       text " in " <> parens (pp (ii+1) vs t2)]
+pp ii vs (As u t) = parens $ pp ii vs u <>
+                    text "as" <>
+                    printType t
+pp _ _ (TUnit) = text "unit"
+pp ii vs (TPair t1 t2) = text "(" <> pp ii vs t1 <>
+                         text "," <> pp ii vs t2 <>
+                         text ")"
+pp ii vs (Fst t) = text "fst " <> pp ii vs t
+pp ii vs (Snd t) = text "snd " <> pp ii vs t
+pp _ _ Zero = text "0"
+pp ii vs (Succ t) = text "succ " <> pp ii vs t
+pp ii vs (R t1 t2 t3) = sep [text "R" <> parensIf (isLam t1 || isApp t1) (pp ii vs t1),
+                             parensIf (isLam t2 || isApp t2) (pp ii vs t2),
+                             parensIf (isLam t3 || isApp t3) (pp ii vs t3)]
+
+isLam :: Term -> Bool
+isLam (Lam _ _) = True
+isLam  _      = False
+
+isApp :: Term -> Bool
+isApp (_ :@: _) = True
+isApp _         = False
+
+-- pretty-printer de tipos
+printType :: Type -> Doc
+printType Base         = text "B"
+printType (Fun t1 t2)  = sep [ parensIf (isFun t1) (printType t1),
+                               text "->",
+                               printType t2]
+printType Unit         = text "Unit"
+printType (Pair t1 t2) = sep [ text "(" <> printType t1, text ", ",
+                               printType t2 <> text ")" ]
+printType Nat          = text "Nat"
+
+isFun :: Type -> Bool
+isFun (Fun _ _)        = True
+isFun _                = False
+
+\end{lstlisting}
+\pagebreak
+\begin{lstlisting}
+
+
+fv :: Term -> [String]
+fv (Bound _)         = []
+fv (Free (Global n)) = [n]
+fv (t :@: u)         = fv t ++ fv u
+fv (Lam _ u)         = fv u
+fv (Let u u')        = fv u ++ fv u'
+fv (As u _)          = fv u
+fv (TUnit)           = []
+fv (TPair u u')      = fv u ++ fv u'
+fv (Fst u)           = fv u
+fv (Snd u)           = fv u
+fv Zero              = []
+fv (Succ n)          = fv n
+fv (R t1 t2 t3)      = fv t1 ++ fv t2 ++ fv t3
+
+---
+printTerm :: Term -> Doc
+printTerm t = pp 0 (filter (\v -> not $ elem v (fv t)) vars) t
+
+\end{lstlisting}
+
+\bigskip
+\bigskip
+\noindent\rule{16cm}{0.4pt}
+\subsection*{Ack.lam}
+\begin{lstlisting}
+
+def ackA = \f:Nat->Nat. \n:Nat. R (f (succ 0)) (\x:Nat. \y:Nat. f x) n
+
+def ack = \m:Nat. R (\n:Nat. succ n) (\x:Nat->Nat. \y:Nat. ackA x) m
+
+\end{lstlisting}
 
 
 \end{document}
