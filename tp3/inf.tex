@@ -1,0 +1,207 @@
+
+\documentclass[a4paper]{article}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{float}
+\renewcommand{\baselinestretch}{1}
+\usepackage[margin=2cm]{geometry}
+\usepackage{proof}
+\usepackage{amssymb}
+
+\setlength{\parindent}{0in}
+
+\begin{document}
+
+
+\begin{titlepage}
+\centering
+\begin{figure}[H]
+    \begin{center}
+        \includegraphics[width=2cm,height=2cm]{UNR_logo.jpg}
+    \end{center}
+\end{figure}
+{\scshape\large Facultad de Ciencias Exactas, Ingenier\'ia y Agrimensura\\*
+                 Licenciatura en Ciencias de la Computaci\'on\par}
+\vspace{3cm}
+{\scshape\LARGE An\'alisis de Lenguajes de Programaci\'on \par}
+{\huge\bfseries Trabajo Pr\'actico 3 \par}
+\vspace{3cm}
+{\Large Sotelo, Bruno\par}
+\vfill
+{\large 10 / 10 / 2017 \par}
+\end{titlepage}
+
+
+\section*{Ejercicio 1}
+$$ S = \lambda x:B\rightarrow B\rightarrow B.\; \lambda y:B\rightarrow B.
+\; \lambda z:B.\; (x\: z)(y\: z) $$
+
+Sean:
+\begin{itemize}
+\item $\Gamma$ un contexto cualquiera,
+\item $\Gamma_{1} = \Gamma \cup \{ x:B\rightarrow B\rightarrow B\}$,
+\item $\Gamma_{2} = \Gamma_{1} \cup \{ y:B\rightarrow B\}$,
+\item $\Gamma_{3} = \Gamma_{2} \cup \{ z:B\}$,
+\end{itemize}
+se puede dar el siguiente \'arbol:
+$$ \infer[\textsc{T-Abs}]
+        {\Gamma \vdash \lambda x:B\rightarrow B\rightarrow B.\;
+         \lambda y:B\rightarrow B.\;\lambda z:B.\; (x\: z)(y\:z)\: :\:
+         (B\rightarrow B\rightarrow B)\rightarrow (B\rightarrow B)
+         \rightarrow B \rightarrow B}
+        {\infer[\textsc{T-Abs}]
+              {\Gamma_{1} \vdash \lambda y:B\rightarrow B.\; \lambda z:B
+               .\; (x\: z)(y\: z)\: :\: (B\rightarrow B) \rightarrow B
+               \rightarrow B}
+              {\infer[\textsc{T-Abs}]
+                    {\Gamma_{2} \vdash \lambda z:B.\; (x\: z)(y\: z)\:
+                     :\: B\rightarrow B}
+                    {\infer[\textsc{T-App}]
+                          {\Gamma_{3} \vdash (x\: z)(y\: z)\: :\: B}
+                          {\infer[\textsc{T-App}]
+                                {\Gamma_{3} \vdash x\: z\: :\:
+                                 B\rightarrow B}
+                                {\infer[\textsc{T-Var}]
+                                      {\Gamma_{3} \vdash x\: :\:
+                                       B\rightarrow B\rightarrow B}{}
+                                 & \infer[\textsc{T-Var}]
+                                      {\Gamma_{3} \vdash z\: :\: B}{}}
+                           & \infer[\textsc{T-App}]
+                                {\Gamma_{3} \vdash y\: z\: :\: B}
+                                {\infer[\textsc{T-Var}]
+                                      {\Gamma_{3} \vdash y\: :\:
+                                       B \rightarrow B}{}
+                                 & \infer[\textsc{T-Var}]
+                                      {\Gamma_{3} \vdash z\: :\: B}{}}
+                           }
+                    }
+              }
+        } $$
+
+
+
+
+\section*{Ejercicio 2}
+\begin{enumerate}
+\item $infer$ retorna el tipo $Either\; String\; Type$ ya que de esta
+        manera puede devolver tanto un mensaje de error ($Left\; String$)
+        como un tipo si el t\'ermino est\'a bien formado ($Right\; Type$).
+\item La funci\'on $\gg =$ realiza un llamado a la funci\'on $either$, y en
+        este contexto lo que hace es: Si el argumento $v\: :\: Either\;
+        String\; Type$ pasado es un mensaje de error (tiene la forma
+        $Left\; msg$), entonces devuelve este mensaje. De lo contrario,
+        $v$ es de la forma $Right\; type$, entonces devuelve el resultado
+        de aplicar $f\: :\: Type\rightarrow Either\; String\; Type$ (el
+        otro argumento que toma $\gg =$) a $v$.
+\end{enumerate}
+
+
+
+
+\section*{Ejercicio 3}
+Derivaci\'on de tipo para $(\textbf{let}\; z = ((\lambda x:B.\: x)\;
+\textbf{as}\; B\rightarrow B)\; \textbf{in}\; z)\; \textbf{as}\;
+B\rightarrow B$ \\
+Sean:
+\begin{itemize}
+    \item $\Gamma$ un contexto cualquiera,
+    \item $\Gamma_{1} = \Gamma \cup \{ x:B\}$,
+    \item $\Gamma_{2} = \Gamma \cup \{ z:B\rightarrow B\}$,
+\end{itemize}
+el \'arbol de derivaci\'on es:
+$$ \infer[\textsc{T-Ascribe}]
+         {\Gamma \vdash (\textbf{let}\; z = ((\lambda x:B.\: x)\;
+          \textbf{as}\; B\rightarrow B)\; \textbf{in}\; z)\;
+          \textbf{as}\; B\rightarrow B\: :\: B\rightarrow B}
+         {\infer[\textsc{T-Let}]
+                {\Gamma \vdash \textbf{let}\; z = ((\lambda x:B.\:
+                 x)\; \textbf{as}\; B\rightarrow B)\; \textbf{in}\;
+                 z\: :\: B\rightarrow B}
+                {\infer[\textsc{T-Ascribe}]
+                       {\Gamma \vdash (\lambda x:B.\: x)\;
+                        \textbf{as}\; B\rightarrow B\: :\:
+                        B \rightarrow B}
+                       {\infer[\textsc{T-Abs}]
+                              {\Gamma \vdash \lambda x:B.\: x\:
+                               :\: B\rightarrow B}
+                              {\infer[\textsc{T-Var}]
+                                     {\Gamma_{1} \vdash x:B}{}}
+                       }
+                 & \infer[\textsc{T-Var}]
+                         {\Gamma_{2} \vdash z:B\rightarrow B}{}}
+         }
+$$
+       
+               
+
+
+\section*{Ejercicio 7}
+Reglas de evaluaci\'on para pares:
+\begin{align}
+    \tag{\textsc{E-PairF}}
+    \infer[]
+         {(t_{1},\: t_{2}) \rightarrow (t'_{1},\: t_{2})}
+         {t_{1} \rightarrow t'_{1}} \\
+    \nonumber \\
+    \tag{\textsc{E-PairS}}
+    \infer[]
+         {(v,\: t) \rightarrow (v,\: t')}
+         {t \rightarrow t'} \\
+    \nonumber \\
+    \tag{\textsc{E-Fst}}
+    \infer[]
+         {\textbf{fst}\; t \rightarrow \textbf{fst}\; t'}
+         {t \rightarrow t'} \\
+    \nonumber \\
+    \tag{\textsc{E-Snd}}
+    \infer[]
+         {\textbf{snd}\; t \rightarrow \textbf{snd}\; t'}
+         {t \rightarrow t'} \\
+    \nonumber \\
+    \tag{\textsc{E-FstApp}}
+    \textbf{fst}\; (v_{1},v_{2}) \rightarrow v_{1} \\
+    \nonumber \\
+    \tag{\textsc{E-SndApp}}
+    \textbf{snd}\; (v_{1},v_{2}) \rightarrow v_{2}
+\end{align}
+                              
+
+
+
+\section*{Ejercicio 9}
+Derivaci\'on de tipo para $\text{fst}\; (\text{unit as Unit},
+\lambda x:(B,B).\: \text{snd}\; x)$ \\
+Sean $\Gamma$ contexto cualquiera, $\Gamma' = \Gamma \cup
+\{ x:(B,B)\}$, el \'arbol de derivaci\'on es:
+$$ \infer[\textsc{T-Fst}]
+        {\Gamma \vdash \text{fst}\; (\text{unit as Unit},
+         \lambda x:(B,B).\; \text{snd}\; x)\: :\: \text{Unit}}
+        {\infer[\textsc{T-Pair}]
+               {\Gamma \vdash (\text{unit as Unit},
+                \lambda x:(B,B).\; \text{snd}\; x)\: :\:
+                (\text{Unit}, (B,B)\rightarrow B)}
+               {\infer[\textsc{T-Ascribe}]
+                      {\Gamma \vdash \text{unit as Unit}\:
+                       :\: \text{Unit}}
+                      {\infer[\textsc{T-Unit}]
+                             {\Gamma \vdash \text{unit : Unit}}
+                             {}}
+                & \infer[\textsc{T-Abs}]
+                        {\Gamma \vdash \lambda x:(B,B).\;
+                         \text{snd}\: x\: :\: (B,B) \rightarrow B}
+                        {\infer[\textsc{T-Snd}]
+                               {\Gamma' \vdash \text{snd}\: x\:
+                                :\: B}
+                               {\infer[\textsc{T-Var}]
+                                      {\Gamma' \vdash x:(B,B)}{}}
+                        }
+                }
+        }
+$$
+
+                        
+
+
+
+\end{document}
+

@@ -1,11 +1,5 @@
 
-def pred = \n:Nat. R 0 (\x:Nat. \y:Nat. y) n
+def ackA = \f:Nat->Nat. \n:Nat. R (f (succ 0)) (\x:Nat. \y:Nat. f x) n
 
--- def ackcur = \n:Nat. R (\n:Nat. succ n) (\x:Nat->Nat. \y:Nat. x) n
-
--- def ack = \m:Nat. \n:Nat. R ((ackcur (pred m)) (succ 0)) (\x:Nat. \y:Nat. (ackcur (pred m)) x) n
-
-def iter = \f:Nat->Nat. \n:Nat. R (f (succ 0)) (\x:Nat. \y:Nat. f x) n
-
-def ack = \m:Nat. R (\n:Nat. succ n) (\x:Nat->Nat. \y:Nat. iter x) m
+def ack = \m:Nat. R (\n:Nat. succ n) (\x:Nat->Nat. \y:Nat. ackA x) m
 
