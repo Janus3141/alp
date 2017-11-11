@@ -1,0 +1,85 @@
+
+\documentclass[a4paper]{report}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{float}
+\renewcommand{\baselinestretch}{1}
+\usepackage[margin=2cm]{geometry}
+\usepackage{proof}
+\usepackage{amssymb}
+\usepackage{listings}
+\renewcommand{\familydefault}{\sfdefault}
+\lstset{language=Haskell, basicstyle=\small}
+
+\newcommand{\bind}{\gg\!\!=}
+
+\setlength{\parindent}{0in}
+
+\begin{document}
+
+
+\begin{titlepage}
+\centering
+\begin{figure}[H]
+    \begin{center}
+        \includegraphics[width=2cm,height=2cm]{UNR_logo.jpg}
+    \end{center}
+\end{figure}
+{\scshape\large Facultad de Ciencias Exactas, Ingenier\'ia y Agrimensura\\*
+                 Licenciatura en Ciencias de la Computaci\'on\par}
+\vspace{3cm}
+{\scshape\LARGE An\'alisis de Lenguajes de Programaci\'on \par}
+{\huge\bfseries Trabajo Pr\'actico 4 \par}
+\vspace{3cm}
+{\Large Sotelo, Bruno\par}
+\vfill
+{\large  / 11 / 2017 \par}
+\end{titlepage}
+
+\section*{Ejercicio 1}
+\subsection*{a)}
+Probemos que $State$ cumple las leyes de las m\'onadas
+\subsubsection*{Ley 1: $return \; x \bind f \; \equiv \; f \; x$}
+\begin{align*}
+    & return \; x \bind f \\
+    = & < \text{Definici\'on de} \; return > \\
+    & State \; (\lambda s \to (x,s)) \bind f \\
+    = & < \text{Definici\'on de} \bind \: > \\
+    & State \; (\lambda t \to 
+      let (v,t') = runState \; (State \; (\lambda s \to (x,s))) \; t \;
+      in \; runState \; (f \; v) \; t') \\
+    = & < \text{Definici\'on de} \; runState > \\
+    & State \; (\lambda t \to
+      let \; (v,t') = (\lambda s \to (x,s)) \; t \;
+      in \; runState \; (f \; v) \; t') \\
+    = & < \beta\text{-reducci\'on} > \\
+    & State \; (\lambda t \to
+      let \; (v,t') = (x,t) \; in \; runState \; (f \; v) \; t') \\
+    = & < \text{Evaluaci\'on de let} > \\
+    & State \; (\lambda t \to runState \; (f \; x) \; t) \\
+    = & < \text{State es \'unico constructor del tipo State,
+         y} \; f \; :: \; a \to State \; b\text{, entonces} \;
+         \exists f' \; :: \; Env \to (b,Env) \; \text{tal que} \;
+         f\: x = State\: f' > \\
+    & State \; (\lambda t \to runState \; (State \: f') \; t) \\
+    = & < \text{Definici\'on de} \; runState > \\
+    & State \; (\lambda t \to f' \: t) \\
+    = & < \eta \text{-reducci\'on} > \\
+    & State \: f' \\
+    = & < \text{Definici\'on de} f \: x > \\
+    & f \: x
+\end{align*}
+
+\subsubsection*{Ley 2: $m \bind f \; \equiv \; m$}
+\begin{align*}
+    & m \bind return \\
+    = & < \text{Definici\'on de } \bind > \\
+    & State \; (\lambda s \to let \; (v,s') = runState\; m\; s
+        in\; runState\; (return\; v)\; s') \\
+    = & < \text{Sabemos que } m\; ::\; State\; a\; \text{, entonces }
+         \exists f\; \text{tal que } m = State\; f > \\
+    & 
+
+
+\end{document}
+

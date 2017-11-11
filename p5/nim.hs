@@ -29,10 +29,7 @@ play t = do row <- getLine
                    4 -> decide fourth 4 amnt
                    5 -> decide fifth 5 amnt
                    _ -> invalid
-        where isValid f a = if (f t) < a
-                           then False
-                           else True
-              decide f r a = if isValid f a
+        where decide f r a = if (f t) >= a && a > 0
                              then return $ case r of
                                             1 -> Table (fir-a) se th fo fi
                                             2 -> Table fir (se-a) th fo fi
