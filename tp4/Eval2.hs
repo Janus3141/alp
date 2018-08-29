@@ -1,4 +1,4 @@
-module Eval2 (eval) where
+module Eval2 (eval,topp) where
 
 import AST
 import Control.Applicative (Applicative(..))
@@ -14,11 +14,6 @@ initState = []
 --Mensajes de error
 data Error = DivByZero | UndefVar Variable
 
-instance Show Error where
-  show DivByZero = "Error: División por cero."
-  show (UndefVar v) = "Error: Variable " ++ show v ++ " indefinida."
-
-
 -- Mónada estado
 newtype StateError a = StateError { runStateError :: Env -> Either Error (a, Env) }
 
@@ -29,18 +24,6 @@ instance Functor StateError where
 instance Applicative StateError where
     pure   = return
     (<*>)  = ap
-
-
--- Se devuelve a main para imprimir mejores mensajes
-data PrettyPrint = Error Error | Environment Env
-
-instance Show PrettyPrint where
-    show (Error err) = show err
-    show (Environment env) = "Estado final\n" ++ show' env
-                      where show' [] = ""
-                            show' ((v,i):xs) = v ++ ": " ++
-                                               show i ++ "\n" ++
-                                               show' xs
 
 
 -- Clase para representar mónadas con estado de variables
@@ -55,6 +38,7 @@ class Monad m => MonadState m where
 class Monad m => MonadError m where
     -- Lanza un error
     throw :: Error -> m a
+
 
 
 instance Monad StateError where
@@ -76,15 +60,17 @@ instance MonadState StateError where
                                         | v /= v' = (v',n):(updt xs)
 
 
+
 instance MonadError StateError where
     throw err = StateError (\_ -> Left err)
 
 
+
 -- Evalua un programa en el estado nulo
-eval :: Comm -> PrettyPrint
-eval p = case runStateError (evalComm p) initState of
-            Left err      -> Error err
-            Right (v,env) -> Environment env
+eval :: Comm -> Either Error ((),Env)
+eval p = runStateError (evalComm p) initState
+
+
 
 -- Evalua un comando en un estado dado
 evalComm :: (MonadState m, MonadError m) => Comm -> m ()
@@ -99,6 +85,7 @@ evalComm c = case c of
                        b' <- evalBoolExp b
                        if b' then return ()
                              else evalComm (Repeat c' b)
+
 
 
 -- Evalua una expresion entera, sin efectos laterales
@@ -119,6 +106,7 @@ evalIntExp e = case e of
                             return $ f a' b'
 
 
+
 -- Evalua una expresion entera, sin efectos laterales
 evalBoolExp :: (MonadState m, MonadError m) => BoolExp -> m Bool
 evalBoolExp e = case e of
@@ -136,3 +124,25 @@ evalBoolExp e = case e of
           helper2 a b f = do a' <- evalBoolExp a
                              b' <- evalBoolExp b
                              return $ f a' b'
+
+
+
+
+-- PrettyPrinter
+data PrettyPrint = Error Error | Environment Env
+
+instance Show PrettyPrint where
+    show (Error err) = case err of
+                        DivByZero -> "Error: Division por cero."
+                        UndefVar v -> "Error: Variable "++ show v ++" indefinida."
+    show (Environment env) = "Estado final\n" ++ show' env
+                      where show' [] = ""
+                            show' ((v,i):xs) = v ++ ": " ++
+                                               show i ++ "\n" ++
+                                               show' xs
+
+
+topp :: Either Error ((),Env) -> PrettyPrint
+topp (Left err)       = Error err
+topp (Right ((),env)) = Environment env
+

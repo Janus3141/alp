@@ -27,12 +27,14 @@ instance Applicative State where
     pure   = return
     (<*>)  = ap      
 
+
 -- Clase para representar mónadas con estado de variables
 class Monad m => MonadState m where
     -- Busca el valor de una variable
     lookfor :: Variable -> m Integer
     -- Cambia el valor de una variable
     update :: Variable -> Integer -> m ()
+
 
 instance MonadState State where
     lookfor v = State (\s -> (lookfor' v s, s))
@@ -43,9 +45,13 @@ instance MonadState State where
                        update' v i ((u, _):ss) | v == u = (v, i):ss
                        update' v i ((u, j):ss) | v /= u = (u, j):(update' v i ss)
 
+
+
 -- Evalua un programa en el estado nulo
 eval :: Comm -> Env
 eval p = snd (runState (evalComm p) initState)
+
+
 
 -- Evalua un comando en un estado dado
 evalComm :: MonadState m => Comm -> m ()
@@ -60,6 +66,8 @@ evalComm c = case c of
                        b' <- evalBoolExp b
                        if b' then return ()
                              else evalComm (Repeat c' b)
+
+
 
 -- Evalua una expresion entera, sin efectos laterales
 evalIntExp :: MonadState m => IntExp -> m Integer

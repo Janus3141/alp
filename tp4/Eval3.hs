@@ -1,4 +1,4 @@
-module Eval3 (eval) where
+module Eval3 (eval,topp) where
 
 import AST
 import Control.Applicative (Applicative(..))
@@ -23,15 +23,16 @@ initState = []
 data Error = DivByZero | UndefVar Variable
              deriving Show
 
+
 -- Trazas de ejecucion
 data CommLog = SkipLog
-             | LetLog
+             | LetLog Variable Integer
              | SeqLog
-             | CondLog
-             | RepeatLog
-             deriving Show
+             | CondLog Bool
+             | RepeatLog String
 
 type Trace = [CommLog]
+
 
 -- Monada estado | error | traza
 newtype StateErrorLog a = SEL { runSEL :: Env -> (Either Error (a,Env), Trace) }
@@ -77,26 +78,31 @@ instance MonadLog StateErrorLog where
     save c = SEL (\s -> (Right ((),s), [c]))
 
 
+
 -- Evalua un programa en el estado nulo
 eval :: Comm -> (Either Error Env, Trace)
 eval p = case runSEL (evalComm p) initState of
             (Left err, t)      -> (Left err,t)
             (Right (v,env), t) -> (Right env,t)
 
+
+
 -- Evalua un comando en un estado dado
 evalComm :: (MonadState m, MonadError m, MonadLog m) => Comm -> m ()
 evalComm c = case c of
     Skip         -> save SkipLog
-    Let v e      -> evalIntExp e >>= \x -> update v x >> save LetLog
+    Let v e      -> evalIntExp e >>= \x -> update v x >> save (LetLog v x)
     Seq c1 c2    -> evalComm c1 >> save SeqLog >> evalComm c2
     Cond b c1 c2 -> do b' <- evalBoolExp b
-                       save CondLog
+                       save $ CondLog b'
                        if b' then evalComm c1
                              else evalComm c2
-    Repeat c' b  -> do evalComm c'
+    Repeat c' b  -> do save $ RepeatLog "Repeat"
+                       evalComm c'
                        b' <- evalBoolExp b
-                       if b' then save RepeatLog
-                             else save RepeatLog >> evalComm (Repeat c' b)
+                       if b' then save $ RepeatLog "End repeat"
+                             else evalComm (Repeat c' b)
+
 
 
 -- Evalua una expresion entera, sin efectos laterales
@@ -117,6 +123,7 @@ evalIntExp e = case e of
                             return $ f a' b'
 
 
+
 -- Evalua una expresion entera, sin efectos laterales
 evalBoolExp :: (MonadState m, MonadError m, MonadLog m) => BoolExp -> m Bool
 evalBoolExp e = case e of
@@ -134,4 +141,36 @@ evalBoolExp e = case e of
           helper2 a b f = do a' <- evalBoolExp a
                              b' <- evalBoolExp b
                              return $ f a' b'
+
+
+
+
+-- PrettyPrinter
+data PrettyPrint = Error Error Trace | Environment Env Trace
+
+
+showTrace :: Trace -> String
+showTrace [] = ""
+showTrace (x:xs) = showLog ++ showTrace xs
+    where showLog = case x of
+                     SkipLog -> "Skip\n"
+                     LetLog v n  -> v ++" = "++ show n ++"\n"
+                     RepeatLog s -> s ++ "\n"
+                     CondLog b   -> "Condition "++ show b ++ "\n"
+                     SeqLog      -> ""
+
+
+instance Show PrettyPrint where
+    show (Error err t) = "Error: " ++ showErr err ++ "Traza de ejecucion:\n" ++ showTrace t
+         where showErr DivByZero    = "division por cero.\n\n"
+               showErr (UndefVar v) = "variable "++ show v ++" no definida.\n"
+    show (Environment e t) = "Estado final:\n" ++ showEnv e ++ "Traza de ejecucion:\n" ++ showTrace t
+         where showEnv [] = "\n"
+               showEnv ((v,n):xs) = v++ ": "++ show n ++ "\n" ++ showEnv xs
+
+
+topp :: (Either Error Env, Trace) -> PrettyPrint
+topp (Left e,t)  = Error e t
+topp (Right e,t) = Environment e t
+
 

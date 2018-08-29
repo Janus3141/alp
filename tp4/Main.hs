@@ -11,7 +11,7 @@ import Parser(parser)
 
 
 -- Modificar este import para usar diferentes evaluadores
-import Eval2
+import Eval3
 ---------------------------------------------------------
 
 main :: IO ()
@@ -25,7 +25,7 @@ run :: [Char] -> IO ()
 run ifile =
     do
     s <- readFile ifile
-    (print . eval) (parser s)
+    (print . topp  . eval) (parser s)
 
 printHelp :: IO ()
 printHelp = do name <- getProgName

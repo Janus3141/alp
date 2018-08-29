@@ -8,8 +8,16 @@
 \usepackage{proof}
 \usepackage{amssymb}
 \usepackage{listings}
+\usepackage{fancyhdr}
 \renewcommand{\familydefault}{\sfdefault}
-\lstset{language=Haskell, basicstyle=\small}
+\lstset{language=Haskell,
+        basicstyle=\small,
+        showspaces=false,
+        showstringspaces=false}
+
+\pagestyle{fancy}
+\lhead{Trabajo pr\'actico 4}
+\rhead{Bruno Sotelo}
 
 \newcommand{\bind}{\gg\!\!=}
 
@@ -27,19 +35,19 @@
 \end{figure}
 {\scshape\large Facultad de Ciencias Exactas, Ingenier\'ia y Agrimensura\\*
                  Licenciatura en Ciencias de la Computaci\'on\par}
-\vspace{3cm}
+\vspace{5cm}
 {\scshape\LARGE An\'alisis de Lenguajes de Programaci\'on \par}
 {\huge\bfseries Trabajo Pr\'actico 4 \par}
 \vspace{3cm}
 {\Large Sotelo, Bruno\par}
 \vfill
-{\large  / 11 / 2017 \par}
+{\large 14  / 11 / 2017 \par}
 \end{titlepage}
 
 \section*{Ejercicio 1}
 \subsection*{a)}
 Probemos que $State$ cumple las leyes de las m\'onadas
-\subsubsection*{Ley 1: $return \; x \bind f \; \equiv \; f \; x$}
+\subsubsection*{Ley 1: $return \; x \bind f \; = \; f \; x$}
 \begin{align*}
     & return \; x \bind f \\
     = & < \text{Definici\'on de} \; return > \\
@@ -58,27 +66,540 @@ Probemos que $State$ cumple las leyes de las m\'onadas
     = & < \text{Evaluaci\'on de let} > \\
     & State \; (\lambda t \to runState \; (f \; x) \; t) \\
     = & < \text{State es \'unico constructor del tipo State,
-         y} \; f \; :: \; a \to State \; b\text{, entonces} \;
-         \exists f' \; :: \; Env \to (b,Env) \; \text{tal que} \;
-         f\: x = State\: f' > \\
+         y} \; f \; :: \; a \to State \; b, \\
+    & \text{entonces} \;\exists f' \; :: \; Env \to (b,Env)\;
+        \text{tal que} \; f\: x = State\: f' > \\
     & State \; (\lambda t \to runState \; (State \: f') \; t) \\
     = & < \text{Definici\'on de} \; runState > \\
     & State \; (\lambda t \to f' \: t) \\
     = & < \eta \text{-reducci\'on} > \\
     & State \: f' \\
-    = & < \text{Definici\'on de} f \: x > \\
+    = & < \text{Definici\'on de } f \: x > \\
     & f \: x
 \end{align*}
 
-\subsubsection*{Ley 2: $m \bind f \; \equiv \; m$}
+\subsubsection*{Ley 2: $m \bind return \; = \; m$}
 \begin{align*}
     & m \bind return \\
     = & < \text{Definici\'on de } \bind > \\
-    & State \; (\lambda s \to let \; (v,s') = runState\; m\; s
+    & State \; (\lambda s \to let \; (v,s') = runState\; m\; s\;
         in\; runState\; (return\; v)\; s') \\
     = & < \text{Sabemos que } m\; ::\; State\; a\; \text{, entonces }
          \exists f\; \text{tal que } m = State\; f > \\
-    & 
+    & State \; (\lambda s \to let \; (v,s') = f\; s\;
+        in\; runState\; (return\; v)\; s') \\
+    = & < \text{Definici\'on de } runState, return > \\
+    & State \; (\lambda s \to let\; (v,s') = f\; s\;
+        in\; (\lambda t \to (v,t'))\; s' \\
+    = & < \beta -\text{reducci\'on} > \\
+    & State\; (\lambda s \to let\; (v,s') = f\; s\; in\; (v,s')) \\
+    = & < \text{Definici\'on de } let > \\
+    & State\; (\lambda s \to f\; s) \\
+    = & < \eta -\text{reducci\'on} > \\ 
+    & State\; f \\
+    = & < \text{Definici\'on de } m > \\
+    & m
+\end{align*}
+
+\subsubsection*{Ley 3: $(m \bind f) \bind g \; = \; m \bind (\lambda x \to f x \bind g)$}
+\begin{align*}
+    & (m \bind f) \bind g \\
+    = & < \text{Definici\'on de } \bind > \\
+    & State\; (\lambda s \to let\; (v,s') = runState\; (m \bind f)\; s\\
+    & \hspace{2cm} in\; runState\; (g\; v)\; s') \\
+    = & < \text{Definici\'on de } \bind > \\
+    & State\; (\lambda s \to let\; (v,s') = runState\; (State\;
+            (\lambda t \to let\; (u,t') = runState\; m\; t \\
+    & \hspace{7.5cm} in\; runState\; (f\; u)\; t'))\; s \\
+    & \hspace{2cm} in\; runState\; (g\; v)\; s') \\
+    = & < \text{Definici\'on de } runState > \\
+    & State\; (\lambda s \to let\; (v,s') = (\lambda t \to
+            let\; (u,t') = runState\; m\; t \\
+    & \hspace{4.9cm} in\; runState\; (f\; u)\; t')\; s \\
+    & \hspace{2cm} in\; runState\; (g\; v)\; s') \\
+    = & < \beta -\text{reducci\'on} > \\
+    & State\; (\lambda s \to let\; (v,s') = let\; (u,t') = runState\; m\; s \\
+    & \hspace{3.9cm} in\; runState\; (f\; u)\; t' \\
+    & \hspace{2cm} in\; runState\; (g\; v)\; s') \\
+    = & < \text{Propiedad de } let > \\
+    & State\; (\lambda s \to let\; (u,t') = runState\; m \; s \\
+    & \hspace{2cm} in\; let\; (v,s') = runState\; (f\; u)\; t' \\
+    & \hspace{2.4cm} in\; runState\; (g\; v)\; s') \\
+    = & < \beta -\text{expansi\'on} > \\
+    & State\; (\lambda s \to let\; (u,t') = runState\; m\; s \\
+    & \hspace{2cm} in\; (\lambda t \to let\; (v,s') = runState\; (f\; u)\; t \\
+    & \hspace{3.5cm} in\; runState\; (g\; v)\; s')\; t') \\
+    = & < runState . State = id > \\
+    & State\; (\lambda s \to let\; (u,t') = runState\; m\; s \\
+    & \hspace{2cm} in\; runState\; (State\;
+            (\lambda t \to let\; (v,s') = runState\; (f\; u)\; t \\
+    & \hspace{6.1cm} in\; runState\; (g\; v)\; s')\; t') \\
+    = & < \beta -\text{expansi\'on} > \\
+    & State\; (\lambda s \to let\; (u,t') = runState\; m\; s \\
+    & \hspace{2cm} in\; runState\; ((\lambda x \to State\;
+            (\lambda t \to let\; (v,s') = runState\; (f\; x)\; t \\
+    & \hspace{7.2cm} in\; runState\; (g\; v)\; s'))\; u)\; t') \\
+    = & <\text{Definici\'on de } \bind > \\
+    & State\; (\lambda s \to let\; (u,t') = runState\; m\; s \\
+    & \hspace{2cm} in\; runState\; ((\lambda x \to f\; x \bind g)\; u)\; t') \\
+    = & <\text{Definici\'on de } \bind > \\
+    & m \bind (\lambda x \to f\; x \bind g)
+\end{align*}
+
+\pagebreak
+
+\subsection*{b)}
+\begin{lstlisting}
+module Eval1 (eval) where
+
+import AST
+import Control.Applicative (Applicative(..))
+import Control.Monad       (liftM, ap)  
+
+-- Estados
+type Env = [(Variable,Integer)]
+
+-- Estado nulo
+initState :: Env
+initState = []
+
+-- Monada estado
+newtype State a = State { runState :: Env -> (a, Env) }
+
+instance Monad State where
+    return x = State (\s -> (x, s))
+    m >>= f = State (\s -> let (v, s') = runState m s in
+                           runState (f v) s')
+
+-- Para calmar al GHC
+instance Functor State where
+    fmap = liftM
+ 
+instance Applicative State where
+    pure   = return
+    (<*>)  = ap      
+
+
+-- Clase para representar monadas con estado de variables
+class Monad m => MonadState m where
+    -- Busca el valor de una variable
+    lookfor :: Variable -> m Integer
+    -- Cambia el valor de una variable
+    update :: Variable -> Integer -> m ()
+
+
+instance MonadState State where
+    lookfor v = State (\s -> (lookfor' v s, s))
+                where lookfor' v ((u, j):ss) | v == u = j
+                                             | v /= u = lookfor' v ss
+    update v i = State (\s -> ((), update' v i s))
+                 where update' v i [] = [(v, i)]
+                       update' v i ((u, _):ss) | v == u = (v, i):ss
+                       update' v i ((u, j):ss) | v /= u = (u, j):(update' v i ss)
+
+
+
+-- Evalua un programa en el estado nulo
+eval :: Comm -> Env
+eval p = snd (runState (evalComm p) initState)
+
+\end{lstlisting}
+\pagebreak
+\begin{lstlisting}
+
+
+-- Evalua un comando en un estado dado
+evalComm :: MonadState m => Comm -> m ()
+evalComm c = case c of
+    Skip         -> return ()
+    Let v e      -> evalIntExp e >>= \x -> update v x
+    Seq c1 c2    -> evalComm c1 >> evalComm c2 >> return ()
+    Cond b c1 c2 -> evalBoolExp b >>= \x -> if x 
+                                            then evalComm c1
+                                            else evalComm c2
+    Repeat c' b  -> do evalComm c'
+                       b' <- evalBoolExp b
+                       if b' then return ()
+                             else evalComm (Repeat c' b)
+
+
+
+-- Evalua una expresion entera, sin efectos laterales
+evalIntExp :: MonadState m => IntExp -> m Integer
+evalIntExp e = case e of
+    Const i   -> return i
+    Var v     -> lookfor v
+    UMinus a  -> let a' = evalIntExp a
+                 in a' >>= \x -> return (-x)
+    Plus a b  -> evalHelper a b (+)
+    Minus a b -> evalHelper a b (-)
+    Times a b -> evalHelper a b (*)
+    Div a b   -> evalHelper a b (div)
+   where evalHelper a b f = do x <- evalIntExp a
+                               y <- evalIntExp b
+                               return $ f x y
+
+
+-- Evalua una expresion entera, sin efectos laterales
+evalBoolExp :: MonadState m => BoolExp -> m Bool
+evalBoolExp e = case e of
+    BTrue   -> return True
+    BFalse  -> return False
+    Eq a b  -> evalIntHelper a b (==)
+    Lt a b  -> evalIntHelper a b (<)
+    Gt a b  -> evalIntHelper a b (>)
+    And a b -> evalBoolHelper a b (&&)
+    Or a b  -> evalBoolHelper a b (||)
+    Not a   -> evalBoolExp a >>= \x -> return $ not x
+  where evalIntHelper a b f = do x <- evalIntExp a
+                                 y <- evalIntExp b
+                                 return $ f x y
+        evalBoolHelper a b f = do x <- evalBoolExp a
+                                  y <- evalBoolExp b
+                                  return $ f x y
+
+\end{lstlisting}
+
+\pagebreak
+
+\section*{Ejercicio 2}
+\begin{lstlisting}
+
+module Eval2 (eval,topp) where
+
+import AST
+import Control.Applicative (Applicative(..))
+import Control.Monad       (liftM, ap)
+
+-- Estados
+type Env = [(Variable,Integer)]
+
+-- Estado nulo
+initState :: Env
+initState = []
+
+--Mensajes de error
+data Error = DivByZero | UndefVar Variable
+
+-- Monada estado
+newtype StateError a = StateError { runStateError :: Env -> Either Error (a, Env) }
+
+-- Para calmar al GHC
+instance Functor StateError where
+    fmap = liftM
+
+instance Applicative StateError where
+    pure   = return
+    (<*>)  = ap
+
+
+-- Clase para representar monadas con estado de variables
+class Monad m => MonadState m where
+    -- Busca el valor de una variable
+    lookfor :: Variable -> m Integer
+    -- Cambia el valor de una variable
+    update :: Variable -> Integer -> m ()
+
+
+-- Clase para representar monadas que lanzan errores
+class Monad m => MonadError m where
+    -- Lanza un error
+    throw :: Error -> m a
+
+
+
+instance Monad StateError where
+    return x = StateError (\s -> Right (x,s))
+    m >>= f  = StateError (\s -> case runStateError m s of
+                                   Left err     -> Left err
+                                   Right (x,s') -> runStateError (f x) s')
+
+
+
+instance MonadState StateError where
+    lookfor v = StateError (\s -> lookfor' s s)
+                where lookfor' [] = \_ -> Left $ UndefVar v
+                      lookfor' ((v',n):ss) | v == v' = \x -> Right (n,x)
+                                           | v /= v' = lookfor' ss
+    update v i = StateError (\s -> Right ((), updt s))
+                 where updt [] = [(v,i)]
+                       updt ((v',n):xs) | v == v' = (v,i):xs
+                                        | v /= v' = (v',n):(updt xs)
+
+
+
+instance MonadError StateError where
+    throw err = StateError (\_ -> Left err)
+
+
+
+-- Evalua un programa en el estado nulo
+eval :: Comm -> Either Error ((),Env)
+eval p = runStateError (evalComm p) initState
+
+
+
+-- Evalua un comando en un estado dado
+evalComm :: (MonadState m, MonadError m) => Comm -> m ()
+evalComm c = case c of
+    Skip         -> return ()
+    Let v e      -> evalIntExp e >>= \x -> update v x
+    Seq c1 c2    -> evalComm c1 >> evalComm c2 >> return ()
+    Cond b c1 c2 -> do b' <- evalBoolExp b
+                       if b' then evalComm c1
+                             else evalComm c2
+    Repeat c' b  -> do evalComm c'
+                       b' <- evalBoolExp b
+                       if b' then return ()
+                             else evalComm (Repeat c' b)
+
+
+
+-- Evalua una expresion entera, sin efectos laterales
+evalIntExp :: (MonadState m, MonadError m) => IntExp -> m Integer
+evalIntExp e = case e of
+    Const i   -> return i
+    Var v     -> lookfor v
+    UMinus a  -> evalIntExp a >>= \x -> return (-x)
+    Plus a b  -> helper a b (+)
+    Minus a b -> helper a b (-)
+    Times a b -> helper a b (*)
+    Div a b   -> do b' <- evalIntExp b
+                    if b' == 0
+                     then throw DivByZero
+                     else evalIntExp a >>= \a' -> return $ div a' b'
+    where helper a b f = do a' <- evalIntExp a
+                            b' <- evalIntExp b
+                            return $ f a' b'
+
+
+
+-- Evalua una expresion entera, sin efectos laterales
+evalBoolExp :: (MonadState m, MonadError m) => BoolExp -> m Bool
+evalBoolExp e = case e of
+    BTrue   -> return True
+    BFalse  -> return False
+    Eq a b  -> helper a b (==)
+    Lt a b  -> helper a b (<)
+    Gt a b  -> helper a b (>)
+    And a b -> helper2 a b (&&)
+    Or a b  -> helper2 a b (||)
+    Not a   -> evalBoolExp a >>= \x -> return $ not x
+    where helper a b f = do a' <- evalIntExp a
+                            b' <- evalIntExp b
+                            return $ f a' b'
+          helper2 a b f = do a' <- evalBoolExp a
+                             b' <- evalBoolExp b
+                             return $ f a' b'
+
+
+
+
+-- PrettyPrinter
+data PrettyPrint = Error Error | Environment Env
+
+instance Show PrettyPrint where
+    show (Error err) = case err of
+                        DivByZero -> "Error: Division por cero."
+                        UndefVar v -> "Error: Variable "++ show v ++" indefinida."
+    show (Environment env) = "Estado final\n" ++ show' env
+                      where show' [] = ""
+                            show' ((v,i):xs) = v ++ ": " ++
+                                               show i ++ "\n" ++
+                                               show' xs
+
+
+topp :: Either Error ((),Env) -> PrettyPrint
+topp (Left err)       = Error err
+topp (Right ((),env)) = Environment env
+
+\end{lstlisting}
+
+\pagebreak
+
+\section*{Ejercicio 3}
+\begin{lstlisting}
+module Eval3 (eval,topp) where
+
+import AST
+import Control.Applicative (Applicative(..))
+import Control.Monad       (liftM, ap)
+
+-- Para calmar al GHC
+instance Functor StateErrorLog where
+    fmap = liftM
+
+instance Applicative StateErrorLog where
+    pure   = return
+    (<*>)  = ap
+
+-- Estados
+type Env = [(Variable,Integer)]
+
+-- Estado nulo
+initState :: Env
+initState = []
+
+--Mensajes de error
+data Error = DivByZero | UndefVar Variable
+             deriving Show
+
+
+-- Trazas de ejecucion
+data CommLog = SkipLog
+             | LetLog Variable Integer
+             | SeqLog
+             | CondLog Bool
+             | RepeatLog String
+
+type Trace = [CommLog]
+
+
+-- Monada estado | error | traza
+newtype StateErrorLog a = SEL { runSEL :: Env -> (Either Error (a,Env), Trace) }
+
+
+class Monad m => MonadState m where
+    lookfor :: Variable -> m Integer
+    update :: Variable -> Integer -> m ()
+
+
+class Monad m => MonadError m where
+    throw :: Error -> m a
+
+
+class Monad m => MonadLog m where
+    save :: CommLog -> m ()
+
+
+instance Monad StateErrorLog where
+    return x = SEL (\s -> (Right (x,s), []))
+    m >>= f = SEL (\s -> case runSEL m s of
+                            (Left err, t)     -> (Left err, t)
+                            (Right (v,s'), t) -> let (v',t') = runSEL (f v) s'
+                                                 in (v',t++t'))
+
+\end{lstlisting}
+\pagebreak
+\begin{lstlisting}
+
+instance MonadState StateErrorLog where
+    lookfor v = SEL (\s -> (lookfor' s s, []))
+                where lookfor' [] = \_ -> Left $ UndefVar v
+                      lookfor' ((v',n):ss) | v == v' = \x -> Right (n,x)
+                                           | v /= v' = lookfor' ss
+    update v i = SEL (\s -> (Right ((), updt s), []))
+                 where updt [] = [(v,i)]
+                       updt ((v',n):xs) | v == v' = (v,i):xs
+                                        | v /= v' = (v',n):(updt xs)
+
+
+instance MonadError StateErrorLog where
+    throw err = SEL (\s -> (Left err, []))
+
+
+instance MonadLog StateErrorLog where
+    save c = SEL (\s -> (Right ((),s), [c]))
+
+
+
+-- Evalua un programa en el estado nulo
+eval :: Comm -> (Either Error Env, Trace)
+eval p = case runSEL (evalComm p) initState of
+            (Left err, t)      -> (Left err,t)
+            (Right (v,env), t) -> (Right env,t)
+
+
+
+-- Evalua un comando en un estado dado
+evalComm :: (MonadState m, MonadError m, MonadLog m) => Comm -> m ()
+evalComm c = case c of
+    Skip         -> save SkipLog
+    Let v e      -> evalIntExp e >>= \x -> update v x >> save (LetLog v x)
+    Seq c1 c2    -> evalComm c1 >> save SeqLog >> evalComm c2
+    Cond b c1 c2 -> do b' <- evalBoolExp b
+                       save $ CondLog b'
+                       if b' then evalComm c1
+                             else evalComm c2
+    Repeat c' b  -> do save $ RepeatLog "Repeat"
+                       evalComm c'
+                       b' <- evalBoolExp b
+                       if b' then save $ RepeatLog "End repeat"
+                             else evalComm (Repeat c' b)
+
+
+
+-- Evalua una expresion entera, sin efectos laterales
+evalIntExp :: (MonadState m, MonadError m, MonadLog m) => IntExp -> m Integer
+evalIntExp e = case e of
+    Const i   -> return i
+    Var v     -> lookfor v
+    UMinus a  -> evalIntExp a >>= \x -> return (-x)
+    Plus a b  -> helper a b (+)
+    Minus a b -> helper a b (-)
+    Times a b -> helper a b (*)
+    Div a b   -> do b' <- evalIntExp b
+                    if b' == 0
+                     then throw DivByZero
+                     else evalIntExp a >>= \a' -> return $ div a' b'
+    where helper a b f = do a' <- evalIntExp a
+                            b' <- evalIntExp b
+                            return $ f a' b'
+
+
+
+-- Evalua una expresion booleana, sin efectos laterales
+evalBoolExp :: (MonadState m, MonadError m, MonadLog m) => BoolExp -> m Bool
+evalBoolExp e = case e of
+    BTrue   -> return True
+    BFalse  -> return False
+    Eq a b  -> helper a b (==)
+    Lt a b  -> helper a b (<)
+    Gt a b  -> helper a b (>)
+    And a b -> helper2 a b (&&)
+    Or a b  -> helper2 a b (||)
+    Not a   -> evalBoolExp a >>= \x -> return $ not x
+    where helper a b f = do a' <- evalIntExp a
+                            b' <- evalIntExp b
+                            return $ f a' b'
+          helper2 a b f = do a' <- evalBoolExp a
+                             b' <- evalBoolExp b
+                             return $ f a' b'
+
+
+
+
+-- PrettyPrinter
+data PrettyPrint = Error Error Trace | Environment Env Trace
+
+
+showTrace :: Trace -> String
+showTrace [] = ""
+showTrace (x:xs) = showLog ++ showTrace xs
+    where showLog = case x of
+                     SkipLog -> "Skip\n"
+                     LetLog v n  -> v ++" = "++ show n ++"\n"
+                     RepeatLog s -> s ++ "\n"
+                     CondLog b   -> "Condition "++ show b ++ "\n"
+                     SeqLog      -> ""
+
+
+instance Show PrettyPrint where
+    show (Error err t) = "Error: " ++ showErr err ++ "Traza de ejecucion:\n" ++ showTrace t
+         where showErr DivByZero    = "division por cero.\n\n"
+               showErr (UndefVar v) = "variable "++ show v ++" no definida.\n"
+    show (Environment e t) = "Estado final:\n" ++ showEnv e ++ "Traza de ejecucion:\n" ++ showTrace t
+         where showEnv [] = "\n"
+               showEnv ((v,n):xs) = v++ ": "++ show n ++ "\n" ++ showEnv xs
+
+
+topp :: (Either Error Env, Trace) -> PrettyPrint
+topp (Left e,t)  = Error e t
+topp (Right e,t) = Environment e t
+
+\end{lstlisting}
+
+
 
 
 \end{document}
