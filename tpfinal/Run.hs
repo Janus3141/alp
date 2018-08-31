@@ -115,7 +115,7 @@ align Justified    = justify
 lineFit :: PDFFont -> [TextTok] -> PDFFloat ->
            (PDFFont, [TextTok], PDFFloat, PDFFloat, [TextTok], Bool)
 lineFit f [] spare     = (f, [], spare, 0, [], True)
-lineFit f (x:xs) spare = case x of
+lineFit f@(PDFFont n s) (x:xs) spare = case x of
     TextWord w -> let wwdt = textWidth f $ toPDFString w in
                   if wwdt > spare
                   then (f, [TextNewLine], spare, 0, (x:xs), False)
@@ -123,22 +123,19 @@ lineFit f (x:xs) spare = case x of
                            (f',prf,waste,wrdCnt',suff,pe) = lineFit f xs spare'
                        in (f', (x:prf), waste, wrdCnt'+1, suff, pe)
     TextNewLine -> (f, [x], spare, 0, xs, True)
-    TextFont n  -> let PDFFont _ s = f
-                       nf = PDFFont n s
-                       (f', prf, waste, wrdCnt, suff, pe) = lineFit nf xs spare
-                   in (f', (x:prf), waste, wrdCnt, suff, pe)
-    TextSize s  -> let PDFFont n _ = f
-                       sf = PDFFont n s
-                       (f', prf, waste, wrdCnt, suff, pe) = lineFit sf xs spare
-                   in (f', (x:prf), waste, wrdCnt, suff, pe)
-    _           -> let (f', prf, waste, wrdCnt, suff, pe) = lineFit f xs spare
-                   in (f', (x:prf), waste, wrdCnt, suff, pe)
+    TextFont n' -> xchg $ PDFFont n' s
+    TextSize s' -> xchg $ PDFFont n s'
+    TextBold    -> xchg $ PDFFont (toBold n) s
+    TextBoldOff -> xchg $ PDFFont (fromBold n) s
+    TextItalics -> xchg $ PDFFont (toItalics n) s
+    TextItalOff -> xchg $ PDFFont (fromItalics n) s
+    where xchg font = let (f', prf, waste, wrdCnt, suff, pe) = lineFit font xs spare
+                      in (f', (x:prf), waste, wrdCnt, suff, pe)
 
 
-
-------------------------------------
---- Dibujado de un PDF ---
-------------------------------------
+------------------------
+--- Dibujo de un PDF ---
+------------------------
 
 -- Dibujar paginas del PDF
 
@@ -153,18 +150,19 @@ drawPDF ((Page (x,y) r):xs) = do let rect = Just $ PDFRect 0 0 x y
 -- Dibujar rectangulos de una pagina
 
 drawRects :: PDFReference PDFPage -> [Rect] -> PDF ()
-drawRects page []                   = drawWithPage page emptyDrawing
-drawRects page ((Rect pos cont):xs) = case cont of
+drawRects page []     = drawWithPage page emptyDrawing
+drawRects page (x:xs) = case cont of
     Empty            -> do dwp emptyDrawing
                            next
     Text algmnt toks -> do dwp $ drawText $ drawTextToks pos algmnt toks
                            next
-    Image file pads  -> do let imgSz = jpegBounds file
+    Image file       -> do let imgSz = jpegBounds file
                            img <- createPDFJpeg file
-                           dwp $ withNewContext $ drawImage pos imgSz img pads
+                           dwp $ withNewContext $ drawImage pos imgSz img 
                            next
-    where dwp = drawWithPage page
-          next = drawRects page xs
+    where Rect pos edgs cont = x
+          dwp = drawWithPage page
+          next = (dwp $ drawEdges pos edgs) >> drawRects page xs
 
 
 -- Dibujar texto en un rectangulo
@@ -198,7 +196,9 @@ drawTok y f@(PDFFont n s) (z:zs) hgt = case z of
     TextFont n' -> changeFont $ PDFFont n' s
     TextSize s' -> changeFont $ PDFFont n s'
     TextBold    -> changeFont $ PDFFont (toBold n) s
+    TextBoldOff -> changeFont $ PDFFont (fromBold n) s
     TextItalics -> changeFont $ PDFFont (toItalics n) s
+    TextItalOff -> changeFont $ PDFFont (fromItalics n) s
     TextNewLine -> let fontHgt = getHeight f
                    in if hgt < y
                       then do startNewLine
@@ -217,29 +217,30 @@ emptyText = displayText $ toPDFString ""
 
 -- Dibujar una imagen en un rectangulo
 
-drawImage :: (Point,Point) ->
-             (Int,Int) ->
-             PDFReference PDFJpeg ->
-             (Int,Int) ->
-             Draw ()
-drawImage (p1,p2) imgSz jpg (px,py) = do applyMatrix mtx
-                                         drawXObject jpg
+drawImage :: (Point,Point) -> (Int,Int) -> PDFReference PDFJpeg -> Draw ()
+drawImage (p1,p2) (w,h) jpg = do applyMatrix mtx
+                                 drawXObject jpg
     where -- Tamaño original de la imagen
-          (imgWdt',imgHgt') = imgSz
-          imgWdt = (fromIntegral imgWdt') :: PDFFloat
-          imgHgt = (fromIntegral imgHgt') :: PDFFloat
-          -- Tamaño de los margenes (padding)
-          padx = (fromIntegral px) :: PDFFloat
-          pady = (fromIntegral py) :: PDFFloat
-          -- Coordenadas del punto inferior izq sumando padding
-          x = min (realPart p1 + padx) (realPart p2 - padx)
-          y = min (imagPart p1 + pady) (imagPart p2 - pady)
-          -- Tamaño final de la imagen contando margenes
-          rectWdt = realPart p2 - padx - x
-          rectHgt = imagPart p2 - pady - y
+          imgWdt = (fromIntegral w) :: PDFFloat
+          imgHgt = (fromIntegral h) :: PDFFloat
+          -- Tamaño del rectangulo
+          (x :+ y) = p1
+          rectWdt = realPart p2 - x
+          rectHgt = imagPart p2 - y
           -- Matriz para acomodar posicion y tamaño
           mtx = Matrix (rectWdt/imgWdt) 0 0 (rectHgt/imgHgt) x y
 
+
+-- Dibujar bordes de un rectangulo
+
+drawEdges :: (Point,Point) -> Edges -> Draw ()
+drawEdges (p1,p2) (u,d,l,r) = drawE1 >> drawE2 >> drawE3 >> drawE4
+    where (x1 :+ y1) = p1
+          (x2 :+ y2) = p2
+          drawE1 = if u then stroke $ Line x1 y2 x2 y2 else emptyDrawing
+          drawE2 = if d then stroke $ Line x1 y1 x2 y1 else emptyDrawing
+          drawE3 = if l then stroke $ Line x1 y1 x1 y2 else emptyDrawing
+          drawE4 = if r then stroke $ Line x2 y1 x2 y2 else emptyDrawing
 
 
 
@@ -248,13 +249,13 @@ c1 :: Content
 c1 = Text FlushedRight [TextFont Courier, TextSize 12, TextWord t]
 
 c2 :: Content
-c2 = Text FlushedRight [TextFont Helvetica, TextSize 20, TextWord t]
+c2 = Text FlushedLeft [TextFont Helvetica, TextSize 20, TextWord t]
 
 t :: String
 t = "Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."
 
 try :: IO ()
-try = do let r1 = Rect ((25 :+ 625), (525 :+ 1225))
-             r2 = Rect ((25 :+ 25), (525 :+ 625)) c2
+try = do let r1 = Rect ((25 :+ 625), (525 :+ 1225)) (False,False,False,False)
+             r2 = Rect ((25 :+ 25), (525 :+ 625)) (True,True,False,False) c2
          Right jpg1 <- readJpegFile "1.jpg"
-         runPdf "test.pdf" standardDocInfo (PDFRect 0 0 0 0) $ drawPDF [Page (550,1250) [r1 (Image jpg1 (30,30)),r2]]
+         runPdf "test.pdf" standardDocInfo (PDFRect 0 0 0 0) $ drawPDF [Page (550,1250) [r1 (Image jpg1),r2]]
