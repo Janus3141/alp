@@ -1,14 +1,17 @@
 module Run where
 
 
+import Control.Monad
 import Graphics.PDF
 import Types
 
 
+
+--------- PASAR A PROCESADOR DE LENGUAJE -----------------------------------
 ------------------------------
 --- Transiciones de fuente ---
 ------------------------------
-
+{-
 toBold :: FontName -> FontName
 toBold Helvetica         = Helvetica_Bold
 toBold Helvetica_Oblique = Helvetica_BoldOblique
@@ -50,87 +53,138 @@ fromItalics fn                    = fn
 
 
 
-------------------------------------
---- Atomizacion de tokens TextWord ---
-------------------------------------
+--------- PASAR A PROCESADOR DE LENGUAJE -----------------------------------
+-----------------------------
+--- Atomizacion de tokens ---
+-----------------------------
 
--- Atomizar tokens de texto. Para separar el texto en lineas
--- que entren en los rectangulos es necesario que un token
--- contenga solo una palabra.
+-- Para separar el texto en lineas que entren en los rectangulos
+-- es necesario que un token TextT contenga solo una palabra.
+-- Los token para letra negrita e italica pueden traducirse a TextFont.
 
-atomizeToks :: [TextTok] -> [TextTok]
-atomizeToks [] = []
-atomizeToks (x:xs) = case x of
-    TextWord w -> (map TextWord $ words w) ++ atomizeToks xs
-    _          -> x:(atomizeToks xs)
+atomizeToks :: FontName -> [TextTok] -> [TextTok]
+atomizeToks _ []     = []
+atomizeToks f (x:xs) = case x of
+    TextT w     -> (map TextT $ words w) ++ atomizeToks f xs
+    TextBold    -> changeFont $ toBold f
+    TextBoldOff -> changeFont $ fromBold f
+    TextItalics -> changeFont $ toItalics f
+    TextItalOff -> changeFont $ fromItalics f
+    _           -> x:(atomizeToks f xs)
+    where changeFont f' = (TextFont f') : (atomizeToks f' xs)
 
-
-
-------------------------------------------
---- Funciones para alineacion de lineas ---
-------------------------------------------
-
-justify :: PDFFont -> [TextTok] -> PDFFloat -> [TextTok]
-justify _ [] _     = []
-justify f toks wdt = if wrdCnt == 0 then []
-                     else let rest = justify f' suff wdt
-                              addedSpace = if wrdCnt == 1 || parEnd then 0
-                                           else waste / (wrdCnt-1)
-                              spacedPref = (TextWordSpa addedSpace):pref
-                          in spacedPref ++ rest
-    where (f', pref, waste, wrdCnt, suff, parEnd) = lineFit f toks wdt
+-}
 
 
+----------------------------
+--- Separacion en lineas ---
+----------------------------
 
-flushLeft :: PDFFont -> [TextTok] -> PDFFloat -> [TextTok]
-flushLeft _ [] _     = []
-flushLeft f toks wdt = if wrdCnt == 0 then []
-                       else let rest = flushLeft f' suff wdt
-                            in pref ++ rest
-    where (f', pref, _, wrdCnt, suff, _) = lineFit f toks wdt
+justify :: AlignFunction
+justify _ waste wrdCnt end = [TextWordSpa addedSpace]
+    where addedSpace = if wrdCnt <= 1 || end then 0 else waste / (wrdCnt-1)
 
 
+flushLeft :: AlignFunction
+flushLeft _ _ _ _ = []
 
-flushRight :: PDFFont -> [TextTok] -> PDFFloat -> [TextTok]
-flushRight _ [] _ = []
-flushRight f toks wdt = if wrdCnt == 0 then []
-                        else let rest = flushRight f' suff wdt
-                                 spaceNum = round (waste / charWidth f' ' ')
-                                 neededSpa = [' ' | _ <- [1..spaceNum]]
-                             in (TextWord neededSpa):pref ++ rest
-    where (f', pref, waste, wrdCnt, suff, _) = lineFit f toks wdt
+
+flushRight :: AlignFunction
+flushRight f waste _ _ = [TextFont Helvetica, TextSize 1] ++
+                         [TextT prefixSpace] ++
+                         [TextFont fn, TextSize fs]
+    where PDFFont fn fs = f
+          minFont = PDFFont Helvetica 1
+          minSpaWdt = charWidth minFont ' '
+          spaceNum = round (waste / minSpaWdt)
+          prefixSpace = ' ' <$ [1..spaceNum]
 
 
 
-align :: Alignment -> PDFFont -> [TextTok] -> PDFFloat -> [TextTok]
-align FlushedRight = flushRight
-align FlushedLeft  = flushLeft
-align Justified    = justify
+-- Encontrar la altura de una linea de texto
+
+lead :: PDFFont -> Text -> PDFFloat
+lead f []     = getHeight f
+lead f@(PDFFont n s) (t:ts) = case t of
+    TextFont n'   -> comp $ PDFFont n' s
+    TextSize s'   -> comp $ PDFFont n s'
+    _             -> lead f ts
+    where comp f' = max (getHeight f) (lead f' ts)
 
 
---------------------------------------
---- Separacion en lineas del texto ---
---------------------------------------
 
-lineFit :: PDFFont -> [TextTok] -> PDFFloat ->
-           (PDFFont, [TextTok], PDFFloat, PDFFloat, [TextTok], Bool)
+-- Buscar ultimo comando de espaciado interlinear en la
+-- linea dada. Si no hay, se devuelve Nothing
+
+lineSpace :: Text -> Maybe PDFFloat
+lineSpace [] = Nothing
+lineSpace ((TextLnSpace sp):xs) = mplus (lineSpace xs) (Just sp)
+lineSpace (x:xs) = lineSpace xs
+
+
+
+-- Toma la fuente inicial, una lista de tokens y el ancho del rectangulo.
+-- Devuelve la ultima fuente encontrada, una linea de texto acotada por el
+-- ancho dado, el espacio sobrante de la linea, la cantidad de palabras que
+-- entraron, el texto que no entro y un booleano que indica True si la linea
+-- termino antes de que el algoritmo termine (es decir, si se encuentra un
+-- retorno de linea o no hay mas texto).
+
+lineFit :: PDFFont -> Text -> PDFFloat ->
+           (PDFFont, Text, PDFFloat, PDFFloat, Text, Bool)
 lineFit f [] spare     = (f, [], spare, 0, [], True)
 lineFit f@(PDFFont n s) (x:xs) spare = case x of
-    TextWord w -> let wwdt = textWidth f $ toPDFString w in
-                  if wwdt > spare
-                  then (f, [TextNewLine], spare, 0, (x:xs), False)
-                  else let spare' = spare - (textWidth f $ toPDFString (w ++ " "))
-                           (f',prf,waste,wrdCnt',suff,pe) = lineFit f xs spare'
-                       in (f', (x:prf), waste, wrdCnt'+1, suff, pe)
+    TextT w     -> if fWdt w > spare
+                   then (f, [TextNewLine], spare, 0, (x:xs), False)
+                   else let spare' = spare - fWdt (w ++ " ")
+                            (f',prf,waste,wrdCnt,suff,le) = lineFit f xs spare'
+                        in (f', (x:prf), waste, wrdCnt+1, suff, le)
     TextNewLine -> (f, [x], spare, 0, xs, True)
-    TextFont n' -> xchg $ PDFFont n' s
-    TextSize s' -> xchg $ PDFFont n s'
-    TextBold    -> xchg $ PDFFont (toBold n) s
-    TextBoldOff -> xchg $ PDFFont (fromBold n) s
-    TextItalics -> xchg $ PDFFont (toItalics n) s
-    TextItalOff -> xchg $ PDFFont (fromItalics n) s
-    where xchg font = let (f', prf, waste, wrdCnt, suff, pe) = lineFit font xs spare
-                      in (f', (x:prf), waste, wrdCnt, suff, pe)
+    TextFont n' -> chgFont $ PDFFont n' s
+    TextSize s' -> chgFont $ PDFFont n s'
+    _           -> chgFont $ f
+    where fWdt = \s -> textWidth f $ toPDFString s
+          chgFont z = let (f', prf, waste, wrdCnt, suff, le) = lineFit z xs spare
+                      in (f', (x:prf), waste, wrdCnt, suff, le)
+
+
+
+-- Agregar lineas de texto mientras entren (verticalmente) en el rectangulo.
+-- Se recibe una funcion de alineacion, la fuente a utilizar al principio,
+-- los tokens de todo el texto y la altura y ancho del rectangulo contenedor.
+-- Se devuelve la fuente inicial del texto que no entro en el rectangulo, el
+-- texto que si entro, el que no, y la altura de la primera linea de texto,
+-- en ese orden.
+
+hgtControl :: AlignFunction -> TextState -> PDFFloat -> PDFFloat ->
+              (Text,Text,PDFFloat)
+hgtControl _ (TextState [] _ _) _ _ = ([],[],0)
+hgtControl fun txt hgt wdt = if wrdCnt <= 0
+                             then ([],[],0)
+                             else if hgt - lineHgt < 0
+                             then ([], [TextFont f, TextSize s, TextLnSpace ls] ++ toks, 0)
+                             else (line' ++ pref, suff, lineHgt)
+    where TextState toks fnt ls = txt
+          (fnt', line, waste, wrdCnt, rest, end) = lineFit fnt toks wdt
+          Just lineSpa = mplus (lineSpace line) (Just ls)
+          lineHgt = (lead fnt line) + lineSpa
+          txt' = TextState rest fnt' lineSpa
+          (pref,suff,nextHgt) = hgtControl fun txt' (hgt-lineHgt) wdt
+          line' = (fun fnt waste wrdCnt end) ++ [TextLead nextHgt] ++ line
+          PDFFont f s = fnt
+
+
+
+align :: Alignment -> TextState -> PDFFloat -> PDFFloat ->
+         (Text, Text, PDFFloat)
+align x = hgtControl fun
+    where fun = case x of
+                    FlushedRight -> flushRight
+                    FlushedLeft  -> flushLeft
+                    Justified    -> justify
+
+
+
 
 
 ------------------------
@@ -138,81 +192,96 @@ lineFit f@(PDFFont n s) (x:xs) spare = case x of
 ------------------------
 
 -- Dibujar paginas del PDF
+-- Se toma el documento que se desea escribir (estructura de cada pagina y texto),
+-- y la estructura de una pagina por defecto. Si el texto no cabe en las paginas
+-- dadas, se crean mas con la estructura adicional hasta utilizarse todo el texto.
 
-drawPDF :: PDFDoc -> PDF ()
-drawPDF [] = return ()
-drawPDF ((Page (x,y) r):xs) = do let rect = Just $ PDFRect 0 0 x y
-                                 page <- addPage rect
-                                 drawRects page r
-                                 drawPDF xs
+drawPDF :: PDFDoc -> Page -> PDF ()
+drawPDF ([], []) _         = return ()
+drawPDF (pages,txt) def_page = case pages of
+                                []     -> do txt' <- drawPage def_page
+                                             drawPDF ([],txt') def_page
+                                (p:ps) -> do txt' <- drawPage p
+                                             drawPDF (ps,txt') def_page
+    where drawPage (Page (x,y) r) = do let rect = Just $ PDFRect 0 0 x y
+                                       page <- addPage rect
+                                       drawRects page r txt
+
+
 
 
 -- Dibujar rectangulos de una pagina
 
-drawRects :: PDFReference PDFPage -> [Rect] -> PDF ()
-drawRects page []     = drawWithPage page emptyDrawing
-drawRects page (x:xs) = case cont of
-    Empty            -> do dwp emptyDrawing
-                           next
-    Text algmnt toks -> do dwp $ drawText $ drawTextToks pos algmnt toks
-                           next
-    Image file       -> do let imgSz = jpegBounds file
-                           img <- createPDFJpeg file
-                           dwp $ withNewContext $ drawImage pos imgSz img 
-                           next
-    where Rect pos edgs cont = x
+drawRects :: PDFReference PDFPage -> [Rect] -> Text -> PDF Text
+drawRects page [] txt     = return txt
+drawRects page (x:xs) txt = case cont of
+    Empty               -> next txt
+    Body algmnt         -> do txt' <- dwp $ drawText $ drawTextToks pos' algmnt txt
+                              next txt'
+    Float_text algmnt t -> do dwp $ drawText $ drawTextToks pos' algmnt t
+                              next txt
+    Image file          -> do let imgSz = jpegBounds file
+                              img <- createPDFJpeg file
+                              dwp $ withNewContext $ drawImage pos' imgSz img 
+                              next txt
+    where Rect pos (padx,pady) edgs cont comm = x
+          pad = (fromIntegral padx) :+ (fromIntegral pady) :: Point
+          pos' = ((fst pos) + pad, (snd pos) - pad)
           dwp = drawWithPage page
-          next = (dwp $ drawEdges pos edgs) >> drawRects page xs
+          next t = do dwp $ drawComment pos' comm
+                      dwp $ drawEdges pos (fst edgs)
+                      dwp $ drawEdges pos' (snd edgs)
+                      drawRects page xs t
 
 
--- Dibujar texto en un rectangulo
 
-drawTextToks :: (Point,Point) -> Alignment -> [TextTok] -> PDFText ()
-drawTextToks (x,y) algmt toks = do setFont font
-                                   textStart (realPart x) (imagPart y - fontHgt)
-                                   renderMode FillText
-                                   leading fontHgt
-                                   drawTok height font aligned 0
-    where [TextFont name, TextSize n] = take 2 toks
-          font = PDFFont name n
-          fontHgt = getHeight font
-          width = realPart y - realPart x
-          height = imagPart y - imagPart x
-          atomToks = atomizeToks $ drop 2 toks
-          aligned = align algmt font atomToks width
+-- Dibujar texto en un rectangulo.
+-- Se recibe la posicion donde se debe escribir, la alineacion requerida y el texto.
+-- Se devuelve el texto que no entro en el rectangulo.
+
+drawTextToks :: (Point,Point) -> Alignment -> Text -> PDFText Text
+drawTextToks pos algmt []   = return []
+drawTextToks pos algmt toks = do setFont font
+                                 textStart x1 (y2 - lead)
+                                 renderMode FillText
+                                 leading lead
+                                 write
+                                 return rest
+    where [TextFont f, TextSize s] = take 2 toks
+          font = PDFFont f s
+          ((x1 :+ y1),(x2 :+ y2)) = pos
+          width = x2 - x1
+          height = y2 - y1
+          txtSt = TextState (drop 2 toks) font 0
+          (aligned,rest,lead) = align algmt txtSt height width
+          write = drawTok font aligned
 
 
--- Procesamiento de tokens de texto
 
-drawTok :: PDFFloat ->      -- Altura del rectangulo
-           PDFFont ->
-           [TextTok] ->
-           PDFFloat ->      -- Cantidad de lineas escritas
-           PDFText ()
-drawTok  _ _ [] _                    = emptyText
-drawTok y f@(PDFFont n s) (z:zs) hgt = case z of
-    TextWord w  -> do displayText (toPDFString $ w ++ " ")
-                      drawTok y f zs hgt
-    TextFont n' -> changeFont $ PDFFont n' s
-    TextSize s' -> changeFont $ PDFFont n s'
-    TextBold    -> changeFont $ PDFFont (toBold n) s
-    TextBoldOff -> changeFont $ PDFFont (fromBold n) s
-    TextItalics -> changeFont $ PDFFont (toItalics n) s
-    TextItalOff -> changeFont $ PDFFont (fromItalics n) s
-    TextNewLine -> let fontHgt = getHeight f
-                   in if hgt < y
-                      then do startNewLine
-                              drawTok y f zs (hgt+fontHgt)
-                      else emptyText
-    TextWordSpa sp -> do wordSpace sp
-                         drawTok y f zs hgt
+-- Procesamiento de tokens de texto.
+-- Se recibe la fuente inicial, la lista de tokens (Text) y el ancho escrito
+-- hasta el momento en la linea (inicialmente 0).
+
+drawTok :: PDFFont -> Text -> PDFText ()
+drawTok _ []                   = return ()
+drawTok f@(PDFFont n s) (t:ts) = case t of
+    TextT w      -> do let w' = toPDFString $ w ++ " "
+                       displayText w'
+                       drawTok f ts
+    TextFont n'  -> changeFont $ PDFFont n' s
+    TextSize s'  -> changeFont $ PDFFont n s'
+    TextNewLine  -> do startNewLine
+                       drawTok f ts
+    TextWordSpa sp  -> do wordSpace sp
+                          drawTok f ts
+    TextLead l      -> do leading l
+                          drawTok f ts
+    _               -> drawTok f ts
     where changeFont font = do setFont font
-                               leading $ getHeight font
-                               drawTok y font zs hgt
+                               drawTok font ts
+          width str = textWidth f str
 
 
-emptyText :: PDFText ()
-emptyText = displayText $ toPDFString ""
 
 
 -- Dibujar una imagen en un rectangulo
@@ -243,19 +312,42 @@ drawEdges (p1,p2) (u,d,l,r) = drawE1 >> drawE2 >> drawE3 >> drawE4
           drawE4 = if r then stroke $ Line x2 y1 x2 y2 else emptyDrawing
 
 
+-- Dibujar un comentario
+
+drawComment :: (Point,Point) -> Comment -> Draw ()
+drawComment _ Nothing      = emptyDrawing
+drawComment pos (Just cmt) = newAnnotation cmt'
+    where ((x1 :+ y1),(x2 :+ y2)) = pos
+          cmt' = TextAnnotation (toPDFString cmt) [x1,y1,x2,y2] Help
 
 
-c1 :: Content
-c1 = Text FlushedRight [TextFont Courier, TextSize 12, TextWord t]
 
-c2 :: Content
-c2 = Text FlushedLeft [TextFont Helvetica, TextSize 20, TextWord t]
+
+
+
 
 t :: String
-t = "Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."
+t = "Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod\
+    \ tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam,\
+    \ quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo\
+    \ consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse\
+    \ cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat\
+    \ non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."
+
+
 
 try :: IO ()
-try = do let r1 = Rect ((25 :+ 625), (525 :+ 1225)) (False,False,False,False)
-             r2 = Rect ((25 :+ 25), (525 :+ 625)) (True,True,False,False) c2
-         Right jpg1 <- readJpegFile "1.jpg"
-         runPdf "test.pdf" standardDocInfo (PDFRect 0 0 0 0) $ drawPDF [Page (550,1250) [r1 (Image jpg1),r2]]
+try = do Right jpg1 <- readJpegFile "1.jpg"
+         runPdf "test.pdf" standardDocInfo (PDFRect 0 0 0 0) $ drawPDF pdf def_page
+    where edges = ((True,True,True,True), (True,True,True,True))
+          c2 = Body FlushedRight
+          r1 = Rect ((25 :+ 625), (525 :+ 1225)) (50,50) edges c2 Nothing
+          c1 = Body FlushedRight
+          r2 = Rect ((25 :+ 25), (525 :+ 625)) (20,10) edges c1 Nothing
+          txt1 = concat $ (words t) <$ [1..8]
+          toks1 = (map TextT txt1) ++ [TextLnSpace 4] ++ (map TextT txt1)
+          toks2 = [TextFont Helvetica, TextSize 12] ++ toks1
+          def_page = Page (550,1250) [r1,r2]
+          pdf = ([], toks2)
+
+

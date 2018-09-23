@@ -3,18 +3,29 @@ module Types where
 import Graphics.PDF
 
 
+-- Tamaño de margenes en pixeles. Cada uno se aplica en igual medida en ambos lados
+-- opuestos. El primer entero indica la medida en el eje x.
+type Margins = (Integer,Integer)
+
 
 -- Texto y sus modificadores
-data TextTok = TextWord String
+data TextTok = TextT String
              | TextFont FontName
              | TextSize Int
-             | TextBold
-             | TextBoldOff
-             | TextItalics
-             | TextItalOff
              | TextNewLine
              | TextWordSpa PDFFloat
+             | TextLead PDFFloat
+             | TextLnSpace PDFFloat
     deriving Show
+
+
+data TextState = TextState { ts_txt :: Text
+                           , ts_font :: PDFFont
+                           , ts_lnSpace :: PDFFloat
+                           }
+
+
+type Text = [TextTok]
 
 
 data Alignment = FlushedRight
@@ -23,12 +34,16 @@ data Alignment = FlushedRight
     deriving Show
 
 
+
+type AlignFunction = PDFFont -> PDFFloat -> PDFFloat -> Bool -> Text
+
+
 -- Contenido que puede aparecer en un rectangulo.
--- El texto es una serie de palabras y modificadores. Cada
--- linea recibe las modificaciones que aparecen antes en
--- la lista.
+-- El texto es una serie de tokens que se escriben en las paginas
+-- creadas en el orden dado (por la lista de rectangulos).
 data Content = Image JpegFile
-             | Text Alignment [TextTok]
+             | Body Alignment
+             | Float_text Alignment Text
              | Empty
 
 
@@ -36,9 +51,16 @@ data Content = Image JpegFile
 -- Estos se interpretan como (Superior, Inferior, Izquierdo, Derecho).
 type Edges = (Bool, Bool, Bool, Bool)
 
+
+-- Comentarios para debug
+type Comment = Maybe String
+
+
 -- Un rectangulo indica su posicion (punto inferior izquierdo,
--- punto superior derecho) y su contenido
-data Rect = Rect (Point,Point) Edges Content
+-- punto superior derecho), el tamaño de sus margenes en pixeles,
+-- los bordes que se deben dibujar (primero externos, luego internos),
+-- su contenido y por ultimo un comentario para debug.
+data Rect = Rect (Point,Point) Margins (Edges,Edges) Content Comment
 
 
 -- Cada pagina incluye dos enteros que indican su tamaño en pixeles
@@ -46,7 +68,8 @@ data Rect = Rect (Point,Point) Edges Content
 data Page = Page (Int,Int) [Rect]
 
 
--- Un documento es un conjunto de paginas.
-type PDFDoc = [Page]
+-- Un documento es un conjunto de paginas y el texto que se debe
+-- escribir en ellas.
+type PDFDoc = ([Page], Text)
 
 
