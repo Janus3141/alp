@@ -196,7 +196,7 @@ align x = hgtControl fun
 -- y la estructura de una pagina por defecto. Si el texto no cabe en las paginas
 -- dadas, se crean mas con la estructura adicional hasta utilizarse todo el texto.
 
-drawPDF :: PDFDoc -> Page -> PDF ()
+drawPDF :: PDFDoc -> Page [Rect] -> PDF ()
 drawPDF ([], []) _         = return ()
 drawPDF (pages,txt) def_page = case pages of
                                 []     -> do txt' <- drawPage def_page
@@ -215,15 +215,15 @@ drawPDF (pages,txt) def_page = case pages of
 drawRects :: PDFReference PDFPage -> [Rect] -> Text -> PDF Text
 drawRects page [] txt     = return txt
 drawRects page (x:xs) txt = case cont of
-    Empty               -> next txt
-    Body algmnt         -> do txt' <- dwp $ drawText $ drawTextToks pos' algmnt txt
-                              next txt'
-    Float_text algmnt t -> do dwp $ drawText $ drawTextToks pos' algmnt t
-                              next txt
-    Image file          -> do let imgSz = jpegBounds file
-                              img <- createPDFJpeg file
-                              dwp $ withNewContext $ drawImage pos' imgSz img 
-                              next txt
+    Cont_empty              -> next txt
+    Cont_body algmnt        -> do txt' <- dwp $ drawText $ drawTextToks pos' algmnt txt
+                                  next txt'
+    Cont_float_txt algmnt t -> do dwp $ drawText $ drawTextToks pos' algmnt t
+                                  next txt
+    Cont_image file         -> do let imgSz = jpegBounds file
+                                  img <- createPDFJpeg file
+                                  dwp $ withNewContext $ drawImage pos' imgSz img 
+                                  next txt
     where Rect pos (padx,pady) edgs cont comm = x
           pad = (fromIntegral padx) :+ (fromIntegral pady) :: Point
           pos' = ((fst pos) + pad, (snd pos) - pad)
@@ -340,9 +340,9 @@ try :: IO ()
 try = do Right jpg1 <- readJpegFile "1.jpg"
          runPdf "test.pdf" standardDocInfo (PDFRect 0 0 0 0) $ drawPDF pdf def_page
     where edges = ((True,True,True,True), (True,True,True,True))
-          c2 = Body FlushedRight
+          c2 = Cont_body FlushedRight
           r1 = Rect ((25 :+ 625), (525 :+ 1225)) (50,50) edges c2 Nothing
-          c1 = Body FlushedRight
+          c1 = Cont_body FlushedRight
           r2 = Rect ((25 :+ 25), (525 :+ 625)) (20,10) edges c1 Nothing
           txt1 = concat $ (words t) <$ [1..8]
           toks1 = (map TextT txt1) ++ [TextLnSpace 4] ++ (map TextT txt1)

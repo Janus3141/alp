@@ -23,8 +23,8 @@ def = emptyDef { commentLine     = "#"
                                     "helvetica", "times_roman", "none", "last_page"]
                , reservedOpNames = ["def", "new_page", "new_grid", "sub", "main",
                                     "image", "page_default", "set_ppi", "vrt",
-                                    "hrz", "grid_default", "text_default", "insert",
-                                    "clean", "debug", "inner_frame", "outer_frame",
+                                    "hrz", "text_default", "insert", "clean",
+                                    "debug", "inner_frame", "outer_frame",
                                     "line_space", "body", "float", "include",
                                     "set_content", "set_grid"]
                }
@@ -33,7 +33,7 @@ def = emptyDef { commentLine     = "#"
 -- Extraccion de parsers por matching
 TokenParser { parens = p_parens
             , identifier = p_identf
-            , reservedOp = p_op
+            , reservedOp = p_rOp
             , reserved = p_rsvd
             , whiteSpace = p_whiteSpace
             , stringLiteral = p_word
@@ -63,19 +63,19 @@ p_free_text = do lookAhead $ char '}'
 
 
 
-p_expression :: Parser VType
-p_expression = do g <- try p_grid
-                  return $ VGrid g
-            <|> do c <- try p_content
-                   return $ VCont c
-            <|> do d <- try p_dimension
-                   return $ VDim d
-            <|> do l <- try p_length
-                   return $ VLength l
-            <|> do n <- try p_int
-                   return $ VInt n
-            <|> do vd <- p_var_doc
-                   return $ VDoc vd
+p_vtype :: Parser VType
+p_vtype = do g <- try p_grid
+             return $ VGrid g
+       <|> do c <- try p_content
+              return $ VCont c
+       <|> do d <- try p_dimension
+              return $ VDim d
+       <|> do l <- try p_length
+              return $ VLength l
+       <|> do n <- try p_int
+              return $ VInt n
+       <|> do vd <- p_var_doc
+              return $ VDoc vd
     where p_var_doc = do d <- p_doc
                          d' <- p_try_var
                          return $ d ++ d'
@@ -88,23 +88,23 @@ p_expression = do g <- try p_grid
 
 
 p_grid' :: Parser GridTerm
-p_grid' = do p_op "new_grid"
+p_grid' = do p_rOp "new_grid"
              rec <- p_braces (p_exp p_grid)
              sz <- p_braces (p_exp p_dimension)
              cols <- p_braces p_int
              rows <- p_braces p_int
              return $ Grid_new rec sz cols rows
-      <|> do p_op "sub"
+      <|> do p_rOp "sub"
              parnt <- p_braces (p_exp p_grid)
              col <- p_braces p_int
              row <- p_braces p_int
              return $ Grid_sub parnt col row
-      <|> do p_op "main"
+      <|> do p_rOp "main"
              page <- p_braces p_int
              return $ Grid_main page
-      <|> do p_op "cp"
+      <|> do p_rOp "cp"
              rec <- p_braces (p_exp p_grid)
-             return $ Grid_Copy rec
+             return $ Grid_copy rec
       <|> do p_rsvd "none"
              return Grid_none
 
@@ -133,14 +133,14 @@ p_font = do p_rsvd "courier"
 
 
 
-p_content' :: Parser (Cont String)
-p_content' = do p_op "image"
+p_content' :: Parser (Cont String String)
+p_content' = do p_rOp "image"
                 img <- p_braces p_free_text
                 return $ Cont_image img
-          <|> do p_op "body"
+          <|> do p_rOp "body"
                  algn <- p_braces p_alignment
                  return $ Cont_body algn
-          <|> do p_op "float"
+          <|> do p_rOp "float"
                  algn <- p_braces p_alignment
                  txt <- p_braces p_free_text
                  return $ Cont_float_txt algn txt
@@ -163,9 +163,23 @@ p_dimension = do x <- p_exp p_length
 
 
 
+p_op :: (Variable -> [Exp VType] -> a) -> Parser a
+p_op cons = do char '\\'
+               op <- p_identf
+               args <- p_braces (p_commaSep p_arg)
+               return $ cons op args
+    where p_arg = do try (char '$')
+                     v <- p_identf
+                     return $ Var v
+                <|> do e <- p_braces p_vtype
+                       return $ Value e
+
+
+
 p_exp :: Parser a -> Parser (Exp a)
 p_exp parse_value = do v <- try parse_value
                        return (Value v)
+                    <|> try (p_op Op)
                     <|> do char '$'
                            ident <- p_identf
                            return (Var ident)
@@ -193,58 +207,54 @@ p_modifier' = do char 'b'
 
 
 p_stmt' :: Parser Stmt
-p_stmt' = do p_op "def"
+p_stmt' = do p_rOp "def"
              v <- p_braces p_identf
              params <- p_params
-             e <- p_braces p_expression
+             e <- p_braces p_vtype
              return $ Def v params e
-       <|> do p_op "vrt"
+       <|> do p_rOp "vrt"
               line_set Vert
-       <|> do p_op "hrz"
+       <|> do p_rOp "hrz"
               line_set Horz
-       <|> do p_op "set_ppi"
+       <|> do p_rOp "set_ppi"
               i <- p_braces p_int
               return $ PPI i
-       <|> do p_op "inner_frame"
+       <|> do p_rOp "inner_frame"
               framing In_frame
-       <|> do p_op "outer_frame"
+       <|> do p_rOp "outer_frame"
               framing Out_frame
-       <|> do p_op "set_content"
+       <|> do p_rOp "set_content"
               g <- p_braces (p_exp p_grid)
               c <- p_braces (p_exp p_content)
               return $ Set_cont g c
-       <|> do p_op "set_grid"
+       <|> do p_rOp "set_grid"
               p <- p_braces p_page
               g <- p_braces (p_exp p_grid)
               return $ Set_grid p g
-       <|> do p_op "page_default"
+       <|> do p_rOp "page_default"
               s <- p_braces (p_exp p_dimension)
-              x <- p_braces (p_exp p_length)
-              y <- p_braces (p_exp p_length)
-              return $ Page_dflt s x y
-       <|> do try (p_op "new_page" >> notFollowedBy (char '{'))
-              return $ Newpage_dflt
-       <|> do p_op "new_page"
-              size <- p_braces (p_exp p_dimension)
-              margns <- p_braces (p_exp p_dimension)
-              return $ Newpage size margns
-       <|> do p_op "grid_default"
               g <- p_braces (p_exp p_grid)
-              return $ Grid_dflt g
-       <|> do p_op "text_default"
+              return $ Page_dflt s g
+       <|> do try (p_rOp "new_page" >> notFollowedBy (char '{'))
+              return $ Newpage_dflt
+       <|> do p_rOp "new_page"
+              size <- p_braces (p_exp p_dimension)
+              grid <- p_braces (p_exp p_grid)
+              return $ Newpage size grid
+       <|> do p_rOp "text_default"
               f <- p_braces p_font
               s <- p_braces p_int
               return $ Text_dflt f s
-       <|> do p_op "clean"
+       <|> do p_rOp "clean"
               g <- p_braces (p_exp p_grid)
               return $ Clean g
-       <|> do p_op "line_space"
+       <|> do p_rOp "line_space"
               i <- p_braces (p_exp p_int)
               return $ Text_line_space i
-       <|> do p_op "include"
+       <|> do p_rOp "include"
               file <- p_braces p_free_text
               return $ Include file
-       <|> do p_op "debug"
+       <|> do p_rOp "debug"
               return Debug
     where line_set st = do g <- p_braces (p_exp p_grid)
                            i <- p_braces p_int
@@ -265,19 +275,6 @@ p_stmt = char '\\' >> p_stmt'
 p_modifier = char '\\' >> p_modifier'
 p_content = char '\\' >> p_content'
 p_grid = char '\\' >> p_grid'
-
-
-
-p_stmt_op :: Parser Stmt
-p_stmt_op = do char '\\'
-               op <- p_identf
-               args <- p_braces (p_commaSep p_arg)
-               return $ Op op args
-    where p_arg = do try (char '$')
-                     v <- p_identf
-                     return $ Var v
-                <|> do e <- p_braces p_expression
-                       return $ Value e
 
 
 
@@ -302,7 +299,7 @@ p_doc = do lookAhead $ oneOf "}$"
                    return [st]
             <|> do esc <- try p_escape
                    return [esc]
-            <|> do op <- try p_stmt_op
+            <|> do op <- try (p_op StmtOp)
                    return [op]
             <|> do t <- noneOf "\\{}$"
                    return [Text_value [t]]
