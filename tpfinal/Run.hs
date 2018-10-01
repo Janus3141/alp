@@ -1,4 +1,4 @@
-module Run where
+module Run (drawPDF) where
 
 
 import Control.Monad
@@ -7,78 +7,9 @@ import Types
 
 
 
---------- PASAR A PROCESADOR DE LENGUAJE -----------------------------------
-------------------------------
---- Transiciones de fuente ---
-------------------------------
-{-
-toBold :: FontName -> FontName
-toBold Helvetica         = Helvetica_Bold
-toBold Helvetica_Oblique = Helvetica_BoldOblique
-toBold Times_Roman       = Times_Bold
-toBold Times_Italic      = Times_BoldItalic
-toBold Courier           = Courier_Bold
-toBold Courier_Oblique   = Courier_BoldOblique
-toBold fn                = fn
-
-
-toItalics :: FontName -> FontName
-toItalics Helvetica      = Helvetica_Oblique
-toItalics Helvetica_Bold = Helvetica_BoldOblique
-toItalics Times_Roman    = Times_Italic
-toItalics Times_Bold     = Times_BoldItalic
-toItalics Courier        = Courier_Oblique
-toItalics Courier_Bold   = Courier_BoldOblique
-toItalics fn             = fn
-
-
-fromBold :: FontName -> FontName
-fromBold Helvetica_Bold        = Helvetica
-fromBold Helvetica_BoldOblique = Helvetica_Oblique
-fromBold Times_Bold            = Times_Roman
-fromBold Times_BoldItalic      = Times_Italic
-fromBold Courier_Bold          = Courier
-fromBold Courier_BoldOblique   = Courier_Oblique
-fromBold fn                    = fn
-
-
-fromItalics :: FontName -> FontName
-fromItalics Helvetica_Oblique     = Helvetica
-fromItalics Helvetica_BoldOblique = Helvetica_Bold
-fromItalics Times_Italic          = Times_Roman
-fromItalics Times_BoldItalic      = Times_Bold
-fromItalics Courier_Oblique       = Courier
-fromItalics Courier_BoldOblique   = Courier_Bold
-fromItalics fn                    = fn
-
-
-
---------- PASAR A PROCESADOR DE LENGUAJE -----------------------------------
------------------------------
---- Atomizacion de tokens ---
------------------------------
-
--- Para separar el texto en lineas que entren en los rectangulos
--- es necesario que un token TextT contenga solo una palabra.
--- Los token para letra negrita e italica pueden traducirse a TextFont.
-
-atomizeToks :: FontName -> [TextTok] -> [TextTok]
-atomizeToks _ []     = []
-atomizeToks f (x:xs) = case x of
-    TextT w     -> (map TextT $ words w) ++ atomizeToks f xs
-    TextBold    -> changeFont $ toBold f
-    TextBoldOff -> changeFont $ fromBold f
-    TextItalics -> changeFont $ toItalics f
-    TextItalOff -> changeFont $ fromItalics f
-    _           -> x:(atomizeToks f xs)
-    where changeFont f' = (TextFont f') : (atomizeToks f' xs)
-
--}
-
-
-----------------------------
---- Separacion en lineas ---
-----------------------------
+------------------------------------------------------------------------------
+---------------------------- Separacion en lineas ----------------------------
+------------------------------------------------------------------------------
 
 justify :: AlignFunction
 justify _ waste wrdCnt end = [TextWordSpa addedSpace]
@@ -187,23 +118,32 @@ align x = hgtControl fun
 
 
 
-------------------------
---- Dibujo de un PDF ---
-------------------------
 
--- Dibujar paginas del PDF
+------------------------------------------------------------------------------
+------------------------------ Dibujo de un PDF ------------------------------
+------------------------------------------------------------------------------
+
+
+drawPDF :: RunDoc -> Page RunCont -> PDF ()
+drawPDF [] _     = return ()
+drawPDF (x:xs) p = drawPiece x p >> drawPDF xs p
+
+
+
+-- Dibujar una seccion del PDF
 -- Se toma el documento que se desea escribir (estructura de cada pagina y texto),
 -- y la estructura de una pagina por defecto. Si el texto no cabe en las paginas
 -- dadas, se crean mas con la estructura adicional hasta utilizarse todo el texto.
 
-drawPDF :: PDFDoc -> Page [Rect] -> PDF ()
-drawPDF ([], []) _         = return ()
-drawPDF (pages,txt) def_page = case pages of
+drawPiece :: PDFPiece RunCont -> Page RunCont -> PDF ()
+drawPiece ([], []) _           = return ()
+drawPiece (pages,txt) def_page = case pages of
                                 []     -> do txt' <- drawPage def_page
-                                             drawPDF ([],txt') def_page
+                                             drawPiece ([],txt') def_page
                                 (p:ps) -> do txt' <- drawPage p
-                                             drawPDF (ps,txt') def_page
-    where drawPage (Page (x,y) r) = do let rect = Just $ PDFRect 0 0 x y
+                                             drawPiece (ps,txt') def_page
+    where drawPage (Page (x,y) r) = do let (x',y') = (fromIntegral x, fromIntegral y)
+                                           rect = Just $ PDFRect 0 0 x' y'
                                        page <- addPage rect
                                        drawRects page r txt
 
@@ -212,7 +152,7 @@ drawPDF (pages,txt) def_page = case pages of
 
 -- Dibujar rectangulos de una pagina
 
-drawRects :: PDFReference PDFPage -> [Rect] -> Text -> PDF Text
+drawRects :: PDFReference PDFPage -> [Rect RunCont] -> Text -> PDF Text
 drawRects page [] txt     = return txt
 drawRects page (x:xs) txt = case cont of
     Cont_empty              -> next txt
@@ -338,7 +278,7 @@ t = "Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod\
 
 try :: IO ()
 try = do Right jpg1 <- readJpegFile "1.jpg"
-         runPdf "test.pdf" standardDocInfo (PDFRect 0 0 0 0) $ drawPDF pdf def_page
+         runPdf "test.pdf" standardDocInfo (PDFRect 0 0 0 0) $ drawPiece pdf def_page
     where edges = ((True,True,True,True), (True,True,True,True))
           c2 = Cont_body FlushedRight
           r1 = Rect ((25 :+ 625), (525 :+ 1225)) (50,50) edges c2 Nothing

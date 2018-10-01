@@ -49,16 +49,22 @@ data Cont a b = Cont_image a
               | Cont_empty
 
 
+type RunCont = Cont JpegFile Text
+
+
 instance Show (Cont a b) where
     show (Cont_image _)        = "Image"
     show (Cont_body _)         = "Body"
-    show (Cont_float_txt _ _) = "Float text"
+    show (Cont_float_txt _ _)  = "Float text"
     show Cont_empty            = "Empty"
 
 
 -- Tipo para indicar que bordes de un rectangulo se deben dibujar.
 -- Estos se interpretan como (Superior, Inferior, Izquierdo, Derecho).
 type Edges = (Bool, Bool, Bool, Bool)
+
+hid :: Edges
+hid = (False,False,False,False)
 
 
 -- Comentarios para debug
@@ -69,22 +75,28 @@ type Comment = Maybe String
 -- punto superior derecho), el tamaño de sus margenes en pixeles,
 -- los bordes que se deben dibujar (primero externos, luego internos),
 -- su contenido y por ultimo un comentario para debug.
-data Rect = Rect (Point,Point) Margins (Edges,Edges) (Cont JpegFile Text) Comment
+data Rect c = Rect (Point,Point) Margins (Edges,Edges) c Comment
 
 
-instance Show Rect where
+instance Show c => Show (Rect c) where
     show (Rect pos mgs _ cont _) = intercalate " " strs
         where strs = ["Rect", show pos, show mgs, show cont]
 
 
 -- Cada pagina incluye dos enteros que indican su tamaño en pixeles
 -- y el conjunto de rectangulos en que esta dividido.
-data Page r = Page (Integer,Integer) r
+data Page c = Page (Integer,Integer) [Rect c]
     deriving Show
 
 
--- Un documento es un conjunto de paginas y el texto que se debe
--- escribir en ellas.
-type PDFDoc = ([Page [Rect]], Text)
+-- Una seccion del documento es un conjunto de paginas dadas manualmente
+-- y el texto a insertar.
+type PDFPiece c = ([Page c], Text)
 
+
+-- Un documento es un conjunto de secciones.
+type PDFDoc c = [PDFPiece c]
+
+
+type RunDoc = PDFDoc RunCont
 
