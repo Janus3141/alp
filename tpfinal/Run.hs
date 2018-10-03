@@ -31,6 +31,19 @@ flushRight f waste _ _ = [TextFont Helvetica, TextSize 1] ++
           prefixSpace = ' ' <$ [1..spaceNum]
 
 
+center :: AlignFunction
+center f waste _ _ = [TextFont Helvetica, TextSize 1] ++
+                         [TextT prefixSpace] ++
+                         [TextFont fn, TextSize fs]
+    where PDFFont fn fs = f
+          minFont = PDFFont Helvetica 1
+          minSpaWdt = charWidth minFont ' '
+          spaceNum = round (waste / minSpaWdt / 2)
+          prefixSpace = ' ' <$ [1..spaceNum]
+
+
+
+
 
 -- Encontrar la altura de una linea de texto
 
@@ -113,6 +126,7 @@ align x = hgtControl fun
                     FlushedRight -> flushRight
                     FlushedLeft  -> flushLeft
                     Justified    -> justify
+                    Center       -> center
 
 
 

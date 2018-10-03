@@ -1,4 +1,4 @@
-module Parser (parser, parseDoc) where
+module Parser (parseDoc) where
 
 import Text.ParserCombinators.Parsec
 import Text.Parsec.Token
@@ -10,17 +10,16 @@ import Types
 import Data.Char
 
 
------------------------
 
-
--- Analizador de Tokens
+-- Analisis de tokens
 def :: LanguageDef st
 def = emptyDef { commentLine     = "#"
                , identStart      = letter
                , identLetter     = alphaNum
                , opLetter        = letter <|> char '_'
-               , reservedNames   = ["empty", "cm", "px", "in", "nl", "courier",
-                                    "helvetica", "times_roman"]
+               , reservedNames   = ["empty", "mm", "px", "in", "nl", "courier",
+                                    "helvetica", "times_roman", "b", "i", "s", "f",
+                                    "justify", "flush_left", "flush_right", "center"]
                , reservedOpNames = ["def", "new_page", "outer_frame", "body",
                                     "image", "page_default", "set_ppi", "include",
                                     "text_default", "add", "clean", "float", "rect",
@@ -103,7 +102,7 @@ p_vtype = do r <- try p_rect
               return $ VLength l
        <|> do n <- try p_int
               return $ VInt n
-       <|> do vd <- p_var_doc
+       <|> do vd <- p_doc
               return $ VDoc vd
     where p_var_doc = do d <- p_doc
                          d' <- p_try_var
@@ -127,8 +126,8 @@ p_length :: Parser Length
 p_length = do x <- p_int
               mg <- p_mgn
               return $ mg x
-    where p_mgn = do p_rsvd "cm"
-                     return CM
+    where p_mgn = do p_rsvd "mm"
+                     return MM
                 <|> do p_rsvd "px"
                        return Pixel
                 <|> do p_rsvd "in"
@@ -167,11 +166,13 @@ p_content' = do p_rOp "image"
                  return $ Cont_float_txt algn txt
           <|> do p_rsvd "empty"
                  return Cont_empty
-    where p_alignment = do try $ string "justify"
+    where p_alignment = do try $ p_rsvd "justify"
                            return Justified
-                      <|> do try $ string "flush_left"
+                      <|> do try $ p_rsvd "flush_left"
                              return FlushedLeft
-                      <|> do string "flush_right"
+                      <|> do try $ p_rsvd "center"
+                             return Center
+                      <|> do p_rsvd "flush_right"
                              return FlushedRight
 
 
@@ -273,13 +274,15 @@ p_escape = do char '\\'
 
 
 p_doc :: Parser Doc
-p_doc = do lookAhead $ oneOf "}$"
+p_doc = do lookAhead $ char '}'
            return []
     <|> do p <- prs
            ps <- p_doc
            return $ conc p ps
     <|> do eof
            return []
+    <?> "any statement, operation or text. Remember\
+         \ to escape '{', '}', '\\' and '$'"
   where prs = try p_modifier
             <|> do st <- try p_stmt
                    return [st]
@@ -287,6 +290,9 @@ p_doc = do lookAhead $ oneOf "}$"
                    return [esc]
             <|> do op <- try (p_op StmtOp)
                    return [op]
+            <|> do char '$'
+                   var <- p_identf <?> "variable. Escape '$' with '\\'"
+                   return [StmtVar var]
             <|> do t <- noneOf "\\{}$"
                    return [Text_value [t]]
         conc [Text_value x] ((Text_value y):ys) = (Text_value (x++y)) : ys
@@ -295,9 +301,10 @@ p_doc = do lookAhead $ oneOf "}$"
 
 
 
-------------------------------------
--- Función de parseo
-------------------------------------
+
+---------------------------------------------------------------------
+---------------------- Función total de parseo ----------------------
+---------------------------------------------------------------------
 
 totParser :: Parser a -> Parser a
 totParser p = do p_whiteSpace
@@ -306,10 +313,6 @@ totParser p = do p_whiteSpace
                  return t
 
 
-parseDoc :: SourceName -> String -> Either ParseError Doc
-parseDoc = parse (totParser p_doc)
-
-
-parser :: String -> Doc
-parser s = either (error. show) id (parseDoc "" s)
+parseDoc :: String -> Either ParseError Doc
+parseDoc = parse (totParser p_doc) ""
 

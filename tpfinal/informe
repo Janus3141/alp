@@ -1,0 +1,80 @@
+
+\include{header}
+
+
+
+######################### Caratula ########################
+
+\def{logoUnr}{\set_cont{\rect{90mm,240mm,120mm,270mm}{0mm,0mm}}{\image{UNR_logo.jpg}}}
+
+\def{textUnr}{\float{justify}{Facultad de Ciencias Exactas, Ingenieria y Agrimensura}}
+\def{textUnrRect}{\set_cont{\rect{0mm,230mm,210mm,240mm}{36mm,1mm}}{$textUnr}}
+
+\def{textLcc}{\float{justify}{Licenciatura en Ciencias de la Computacion}}
+\def{textLccRect}{\set_cont{\rect{0mm,225mm,210mm,235mm}{50mm,1mm}}{$textLcc}}
+
+\def{logoH}{\set_cont{\rect{70mm,160mm,140mm,230mm}{0mm,0mm}}{\image{haskell.jpg}}}
+
+
+\def{textTitle}{\set_cont{\rect{0mm,20mm,210mm,160mm}{10mm,1mm}}{\body{center}}}
+
+
+\new_page{$a4}{$logoUnr, $textUnrRect, $textLccRect, $logoH, $textTitle}
+
+\line_space{15}
+
+\s{24}{\b{Trabajo Practico Final \nl Analisis de Lenguajes de Programacion}}
+\nl
+\line_space{120}
+\s{16}{Bruno Sotelo}
+\nl
+\s{16}{03 / 10 / 2018}
+
+
+
+########################## Seteo cuerpo ########################
+
+\def{encabezadoI}{\float{flush_left}{Bruno Sotelo}}
+\def{encabezadoI}{\set_cont{\rect{0mm,277mm,210mm,282mm}{20mm,0mm}}{$encabezadoI}}
+
+\def{encabezadoD}{\float{flush_right}{Trabajo Practico Final}}
+\def{encabezadoD}{\set_cont{\rect{0mm,277mm,210mm,282mm}{20mm,0mm}}{$encabezadoD}}
+
+\def{mainRect}{\inner_frame{\rect{0mm,0mm,$a4}{20mm,20mm}}{u}}
+
+\page_default{$a4}{$mainRect, $encabezadoI, $encabezadoD}
+
+
+
+######################### Cuerpo ####################
+
+\new_page
+
+\line_space{20}
+
+\title{{Descripcion del lenguaje}}
+\line_space{7}
+En este trabajo practico se implemento un programa que permite crear PDFs con
+un lenguaje simple. Este lenguaje posee un estilo de sintaxis similar a Latex,
+las operaciones comienzan con una barra (\\) y sus argumentos se dan entre llaves,
+mientras el cuerpo del documento se escribe libremente. \nl
+Para controlar la forma del documento, se utilizan rectangulos que pueden contener
+texto o imagenes JPEG. Estos rectangulos, ademas de los tamaños de pagina y otras
+caracteristicas, se manejan a partir de sentencias del lenguaje. Antes de
+describirlas, algunas cosas a tener en cuenta: Se diferencian dos tipos de texto,
+uno es el cuerpo del documento, el cual se escribe libremente, exceptuando los
+caracteres \\, \{, \} y \$ que deben ser antecedidos por '\\', ya que estan
+reservados para operaciones y variables; este texto se escribe secuencialmente en
+todos los rectangulos con contenido 'body', en el orden en que estos fueron dados
+(es decir, si no entra en uno, se sigue escribiendo en el proximo rectangulo).
+El otro tipo de texto es el 'texto flotante', que solo puede ocupar el rectangulo
+en donde fue insertado, todo el texto que no entre en el sera perdido; y no puede
+recibir modificaciones, es escrito siguiendo la fuente predeterminada. \nl
+Tambien se diferencian dos tipos de paginas, aquellas creadas manualmente a partir
+de alguna de las dos sentencias new_page, y aquellas creadas automaticamente por
+el programa; estas ultimas aparecen cuando no queda mas espacio en las 'paginas
+manuales' para escribir el texto del cuerpo, y son creadas con el patron
+predeterminado, que puede ser modificado.
+
+
+

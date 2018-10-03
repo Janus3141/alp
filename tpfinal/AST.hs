@@ -4,22 +4,31 @@ import Types
 import Graphics.PDF
 
 
+-- El contenido que puede tener un rectangulo al momento de parsear.
+-- El primer tipo String es para las direcciones de las imagenes que
+-- se insertan. El segundo es para el texto del texto 'flotante'
+-- (el que va separado del cuerpo del documento).
 type ParserCont = Cont String String
 
 
 type Variable = String
 
 
-data Length = Pixel Integer | CM Integer | Inch Integer
+-- Tipo para longitudes: pixeles, milimetros y pulgadas.
+data Length = Pixel Integer | MM Integer | Inch Integer
               deriving Show
 
-
+-- Un par de longitudes, utilizado para los tamaños de hoja
+-- y para el posicionamiento de rectangulos.
 type LenPair = (Exp Length, Exp Length)
 
 
 type IntPair = (Integer,Integer)
 
 
+-- Los rectangulos usados al parsear. Se inician con 'rect' (ParserRect),
+-- y pueden modificarse con las demas funciones (se devuelve un nuevo
+-- rectangulo).
 data ParserRect = ParserRect (Exp LenPair, Exp LenPair) (Exp LenPair)
                 | Clean (Exp ParserRect)
                 | In_frame (Exp ParserRect) String
@@ -28,21 +37,35 @@ data ParserRect = ParserRect (Exp LenPair, Exp LenPair) (Exp LenPair)
     deriving Show
 
 
+-- Tipo para expresiones. En algunos casos puede esperarse un valor,
+-- una variable, o una operacion (Op nombre_operacion [argumentos])
+-- que evalua a un valor del tipo esperado.
 data Exp a = Value a
            | Op Variable [Exp VType]
            | Var Variable
     deriving Show
 
 
+-- Tipos de valor que puede tomar una variable
 data VType = VLength  Length
            | VLenPair LenPair
            | VRect    ParserRect
            | VCont    ParserCont
            | VInt     Integer
            | VDoc     Doc
-    deriving Show
 
 
+instance Show VType where
+    show (VLength _)  = "\"longitud\""
+    show (VLenPair _) = "\"longitudes\""
+    show (VRect _)    = "\"rectangulo\""
+    show (VCont _)    = "\"contenido\""
+    show (VInt _)     = "\"entero\""
+    show (VDoc _)     = "\"sentencias/texto\""
+
+
+-- Sentencias, modificadores de texto y el cuerpo del
+-- documento (Text_value).
 data Stmt = Def Variable [Variable] VType
           | StmtVar Variable
           | StmtOp Variable [Exp VType]
@@ -63,7 +86,7 @@ data Stmt = Def Variable [Variable] VType
           | Text_return
           | Text_line_space (Exp Integer)
           | Text_value String
-          | Include String
+          | Include FilePath
           | Debug
     deriving Show
 

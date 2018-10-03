@@ -1,0 +1,9 @@
+
+
+#### Tamaños de pagina predeterminados
+\def{a4}{210mm,297mm}
+\def{a3}{420mm,297mm}
+
+#### Un estilo para titulos
+\def{title}[txt]{\b{\s{24}{$txt}} \nl}
+

@@ -32,6 +32,7 @@ type Text = [TextTok]
 data Alignment = FlushedRight
                | FlushedLeft
                | Justified
+               | Center
     deriving Show
 
 

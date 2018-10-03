@@ -2,8 +2,13 @@
 {-# LANGUAGE FlexibleContexts #-}
 
 
+module Eval (eval, EvalDoc, EvalCont) where
+
+
+
 import Control.Monad.State
 import Control.Monad.Except
+import Text.Parsec.Error (ParseError)
 import AST
 import Types
 import Graphics.PDF
@@ -61,12 +66,33 @@ type EvalRect = Rect EvalCont
 ---------------------------------- Errores -----------------------------------
 ------------------------------------------------------------------------------
 
-data Error = UndefVar Variable
-           | UnknownStmt Stmt
-           | ExpectedEType String EvalVType
-           | ExpectedVType String VType
-           | ExpectedVar String
-           | ExpectedOp String
+data Error = UndefVar Variable FilePath
+           | UnknownStmt Stmt FilePath
+           | ExpectedEType String EvalVType FilePath
+           | ExpectedVType String VType FilePath
+           | ExpectedVar String FilePath
+           | ExpectedOp String FilePath
+           | ParserErr ParseError
+
+
+instance Show Error where
+    show (UndefVar var f)        = show f ++ ": Variable " ++ var ++ " no definida."
+    show (UnknownStmt stmt f)    = show f ++ ": Sentencia " ++
+                                   show stmt ++ " desconocida."
+    show (ExpectedEType s evt f) = show f ++ ": Se esperaba " ++ show s ++
+                                   ", pero se encontro " ++ show evt
+    show (ExpectedVType s vt f)  = show f ++ ": Se esperaba " ++ show s ++
+                                   ", pero se encontro " ++ show vt
+    show (ExpectedVar v f)       = show f ++ ": Se esperaba una variable," ++
+                                   " pero " ++ v ++ " es una operacion"
+    show (ExpectedOp v f)        = show f ++ ": Se esperaba una operacion," ++
+                                   " pero " ++ v ++ " es una variable"
+    show (ParserErr err)          = show err
+
+
+
+throwErrorFile :: (MonadError Error m, MonadState Env m) => (FilePath -> Error) -> m a
+throwErrorFile fun = gets file >>= throwError . fun
 
 
 
@@ -87,13 +113,13 @@ data EvalVType = EVLength Integer
                | EVDoc Doc
 
 
-toEV :: VType -> b -> EvalVType
-toEV (VLength _)  = EVLength
-toEV (VLenPair _) = EVLenPair
-toEV (VRect _)    = EVRect
-toEV (VCont _)    = EVCont
-toEV (VInt _)     = EVInt
-toEV (VDoc _)     = EVDoc
+instance Show EvalVType where
+    show (EVLength _)  = "\"longitud\""
+    show (EVLenPair _) = "\"longitudes\""
+    show (EVRect _)    = "\"rectangulo\""
+    show (EVCont _)    = "\"contenido\""
+    show (EVInt _)     = "\"entero\""
+    show (EVDoc _)     = "\"sentencias/texto\""
 
 
 
@@ -192,7 +218,8 @@ addRects rs env = env { doc = docAdd (doc env) }
 
 
 addPg :: Page EvalCont -> Env -> Env
-addPg page env = env { doc = (doc env) ++ [([page], [])] }
+addPg page env = let PDFFont n s = head (used_fonts env)
+                 in env { doc = (doc env) ++ [([page], [TextFont n, TextSize s])] }
 
 
 addText :: Text -> Env -> Env
@@ -206,28 +233,56 @@ addText txt env = env { doc = docAdd (doc env) }
 
 
 
+
 ------------------------------------------------------------------------------
 --------------------------------- Evaluacion ---------------------------------
 ------------------------------------------------------------------------------
 
 
--- El conjunto de Stmt se evalua hasta que termina o hasta que se encuentra un
--- Include. En ese caso se vuelve a eval, donde se abre el archivo a incluir,
--- se evalua, y se sigue con el archivo original.
+-- eval devuelve solo la pagina a usar por defecto y el documento (paginas
+-- manuales y texto), o un error. Ademas agrega la fuente predeterminada al
+-- principio del texto, lo cual es requerido por drawPDF en Run.hs
 
-eval :: Env -> Doc -> IO (Either Error (Doc,Env))
-eval e [] = return $ Right ([], e)
-eval e d = do rem <- return $ evalDoc e d
-              res <- either (return . Left) test rem
-              either (return . Left) continue res
+eval :: FilePath -> Doc -> IO (Either Error (Page EvalCont, EvalDoc))
+eval fl d = do ev <- eval' (initState {file = fl}) d
+               return $ either Left (Right . extract . snd) ev
+    where extract e = (page_def e, addFont (font_def e) (doc e))
+          addFont _ [] = []
+          addFont f ((ps,txt):xs) = let PDFFont n s = f
+                                    in (ps,[TextFont n, TextSize s]++txt) : xs
+
+
+-- El conjunto de Stmt se evalua hasta que termina o hasta que se encuentra un
+-- Include. En ese caso se vuelve a eval, donde se maneja el Include, y se sigue
+-- con el archivo original.
+
+eval' :: Env -> Doc -> IO (Either Error (Doc,Env))
+eval' e [] = return $ Right ([], e)
+eval' e d = do rem <- return $ evalDoc e d
+               res <- either (return . Left) test rem
+               either (return . Left) continue res
     where test (d',e') = case d' of
                           []               -> return $ Right (d',e')
-                          ((Include f):xs) -> incldHandler e' f
-                          (x:_)            -> return $ Left (UnknownStmt x)
-          incldHandler env f = do cont <- readFile f
-                                  eval (env {file = f}) (parser cont)
-          continue (d',e') = eval (e' {file = file e}) d'
+                          ((Include f):xs) -> do let fix = Right . ((,) xs)
+                                                 res <- incldHandler e' f
+                                                 return $ either Left fix res
+                          (x:_)            -> return $ Left (UnknownStmt x (file e))
+          continue (d',e') = eval' (e' {file = file e}) d'
 
+
+
+-- Cuando se recibe un Include y se parsea el archivo incluido, si hay
+-- algun error de parseo, se devuelve un ParseError sobre Error, de lo
+-- contrario se lo evalua. En caso de una evaluacion correcta, eval'
+-- devolvera Right ([],e), por lo tanto se omite Doc.
+
+incldHandler :: Env -> FilePath -> IO (Either Error Env)
+incldHandler env f = do cont <- readFile f
+                        cont' <- return $ parseDoc cont
+                        either failure evaluate cont'
+    where evaluate d = do result <- eval' (env {file = f}) d
+                          return $ either Left (Right . snd) result
+          failure = return . Left . ParserErr
 
 
 
@@ -244,19 +299,19 @@ evalDoc' (x:xs) = evalStmt x >> evalDoc' xs
 
 evalStmt :: (MonadError Error m, MonadState Env m) => Stmt -> m ()
 evalStmt (Def v vs e)       = case vs of
-                                [] -> do exp <- liftM (toEV e) $ evalVType e
+                                [] -> do exp <- evalVType e
                                          modify $ updateVar (v, Right exp)
                                 _  -> modify $ updateVar (v, Left (vs,e))
 evalStmt (StmtVar v)        = do
         ev <- lookForVar v
         case ev of
             EVDoc d -> evalDoc' d >> return ()
-            _       -> throwError (ExpectedEType "Document" ev)
+            _       -> throwErrorFile (ExpectedEType "sentencias o texto" ev)
 evalStmt (StmtOp op args)   = do
         vvt <- lookForOp op
         case snd vvt of
             VDoc _ -> execDoc vvt args
-            _      -> throwError (ExpectedVType "Document" $ snd vvt)
+            _      -> throwErrorFile (ExpectedVType "sentencias o texto" $ snd vvt)
 evalStmt (PPI n)            = modify $ updatePpi n
 evalStmt (Add_rects rs)     = do rs' <- mapM evalExpRect rs
                                  modify $ addRects rs'
@@ -276,7 +331,7 @@ evalStmt (Text_ital_off)    = fontStepBack
 evalStmt (Text_font n)      = transFont (\_ -> n)
 evalStmt (Text_font_normal) = fontStepBack
 evalStmt (Text_resize s)    = do let name = fontName . head
-                                     s' = fromIntegral s
+                                 s' <- liftM fromIntegral $ evalExpInt s
                                  cfs <- gets used_fonts
                                  modify $ updateFonts (PDFFont (name cfs) s')
                                  modify $ addText [TextSize s']
@@ -285,10 +340,14 @@ evalStmt (Text_size_normal) = do modify removeFont
                                  modify $ addText [TextSize $ fontSize $ head cfs]
 evalStmt (Text_return)      = modify $ addText [TextNewLine]
 evalStmt (Text_line_space s) = do
-        s' <- evalExpInt
-        modify $ addText [TextLnSpace $ fromIntegral s]
+        s' <- liftM fromIntegral $ evalExpInt s
+        modify $ addText [TextLnSpace s']
 evalStmt (Text_value v)     = modify $ addText (map TextT $ words v)
 evalStmt (Debug)            = modify setDebug
+
+
+
+
 
 
 -- Vuelve a la fuente usada antes de hacer una modificacion.
@@ -322,29 +381,30 @@ execDoc (vars, (VDoc vt)) args = do
 
 
 
+
 evalExpVType :: (MonadError Error m, MonadState Env m) => Exp VType -> m EvalVType
 evalExpVType (Var v)      = lookForVar v
 evalExpVType (Op op args) = do vvt <- lookForOp op
-                               liftM (toEV (snd vvt)) $ exec vvt args
-evalExpVType (Value v)    = liftM (toEV v) $ evalVType v
+                               exec vvt args
+evalExpVType (Value v)    = evalVType v
 
 
 
-evalVType :: (MonadError err m, MonadState Env m) => VType -> m a
-evalVType (VLength len)     = evalLength len
+evalVType :: (MonadError Error m, MonadState Env m) => VType -> m EvalVType
+evalVType (VLength len)     = liftM EVLength $ evalLength len
 evalVType (VLenPair (x,y))  = do x' <- evalExpLength x
                                  y' <- evalExpLength y
-                                 return (x', y')
-evalVType (VRect r)         = evalRect r
-evalVType (VCont cont)      = evalCont cont
-evalVType (VInt i)          = return i
-evalVType (VDoc d)          = return d
+                                 return $ EVLenPair (x', y')
+evalVType (VRect r)         = liftM EVRect $ evalRect r
+evalVType (VCont cont)      = liftM EVCont $ evalCont cont
+evalVType (VInt i)          = return $ EVInt i
+evalVType (VDoc d)          = return $ EVDoc d
 
 
 
 
 
-exec :: (MonadError Error m, MonadState Env m) => ([Variable],VType) -> [Exp VType] -> m a
+exec :: (MonadError Error m, MonadState Env m) => ([Variable],VType) -> [Exp VType] -> m EvalVType
 exec (vars,vt) args = do
         oldVarState <- gets var                            -- Guardar estado de var
         evalArgs <- mapM evalExpVType args                 -- Evaluar argumentos
@@ -363,12 +423,13 @@ evalExpInt (Var v) = do
         val <- lookForVar v
         case val of
           EVInt p -> return p
-          _       -> throwError (ExpectedEType "Integer" val)
+          _       -> throwErrorFile (ExpectedEType "entero" val)
 evalExpInt (Op op args) = do
         vvt <- lookForOp op
         case snd vvt of
-           VInt _ -> exec vvt args
-           _      -> throwError (ExpectedVType "Integer" $ snd vvt)
+           VInt _ -> do EVInt i <- exec vvt args
+                        return i
+           _      -> throwErrorFile (ExpectedVType "entero" $ snd vvt)
 evalExpInt (Value x) = return x
 
 
@@ -380,16 +441,16 @@ evalExpLPair (Var v) = do
         val <- lookForVar v
         case val of
           EVLenPair p -> return p
-          _           -> throwError (ExpectedEType "Length pair" val)
+          _           -> throwErrorFile (ExpectedEType "longitudes" val)
 evalExpLPair (Op op args) = do
         vvt <- lookForOp op
         case snd vvt of
-           VLenPair _ -> exec vvt args
-           _          -> throwError (ExpectedVType "Length pair" $ snd vvt)
+           VLenPair _ -> do EVLenPair p <- exec vvt args
+                            return p
+           _          -> throwErrorFile (ExpectedVType "longitudes" $ snd vvt)
 evalExpLPair (Value (x,y)) = do x' <- evalExpLength x
                                 y' <- evalExpLength y
                                 return (x',y')
-
 
 
 
@@ -400,15 +461,17 @@ evalExpLength (Var v) = do
         val <- lookForVar v
         case val of
            EVLength l -> return l
-           _          -> throwError (ExpectedEType "Length" val)
+           _          -> throwErrorFile (ExpectedEType "longitud" val)
 evalExpLength (Value v) = evalLength v
 
 
 
 evalLength :: (MonadError Error m, MonadState Env m) => Length -> m Integer
 evalLength (Pixel i) = return i
-evalLength (CM i)    = gets ppi >>= \p -> return $ round (p * i * 2.54)
-evalLength (Inch i)  = gets ppi >>= \p -> return $ p * i
+evalLength (MM i)    = do p <- gets ppi
+                          return $ round ((fromIntegral p) * (fromIntegral i) * 0.0394)
+evalLength (Inch i)  = do p <- gets ppi 
+                          return $ p * i
 
 
 
@@ -419,14 +482,15 @@ evalExpRect (Var v) = do
         val <- lookForVar v
         case val of
            EVRect r -> maybeDebug v r
-           _        -> throwError (ExpectedEType "Rectangle" val)
+           _        -> throwErrorFile (ExpectedEType "rectangulo" val)
 evalExpRect (Op op args) = do
         vvt <- lookForOp op
         case snd vvt of
-           VRect _ -> do r <- exec vvt args
+           VRect _ -> do EVRect r <- exec vvt args
                          maybeDebug ("\\" ++ op) r
-           _       -> throwError (ExpectedVType "Rectangle" $ snd vvt)
+           _       -> throwErrorFile (ExpectedVType "rectangulo" $ snd vvt)
 evalExpRect (Value v) = evalRect v
+
 
 
 maybeDebug :: (MonadError Error m, MonadState Env m) => String -> EvalRect -> m EvalRect
@@ -434,6 +498,7 @@ maybeDebug msg (Rect p m e c _) = do
         d <- gets debug
         if d then return (Rect p m e c (Just msg))
              else return (Rect p m e c Nothing)
+
 
 
 evalRect :: (MonadError Error m, MonadState Env m) => ParserRect -> m EvalRect
@@ -462,12 +527,13 @@ evalExpCont (Var v) = do
         val <- lookForVar v
         case val of
            EVCont c -> return c
-           _        -> throwError (ExpectedEType "Content" val)
+           _        -> throwErrorFile (ExpectedEType "contenido" val)
 evalExpCont (Op op args) = do
         vvt <- lookForOp op
         case snd vvt of
-           VCont _ -> exec vvt args
-           _       -> throwError (ExpectedVType "Contenido" $ snd vvt)
+           VCont _ -> do EVCont c <- exec vvt args
+                         return c
+           _       -> throwErrorFile (ExpectedVType "contenido" $ snd vvt)
 evalExpCont (Value v) = evalCont v
 
 
@@ -475,7 +541,10 @@ evalExpCont (Value v) = evalCont v
 evalCont :: (MonadError Error m, MonadState Env m) => ParserCont -> m EvalCont
 evalCont (Cont_image x) = return $ Cont_image x
 evalCont (Cont_body a) = return $ Cont_body a
-evalCont (Cont_float_txt algnt t) = return $ Cont_float_txt algnt (map TextT (words t))
+evalCont (Cont_float_txt algnt t) = do
+        PDFFont nm sz <- gets font_def
+        txt <- return $ [TextFont nm, TextSize sz] ++ map TextT (words t)
+        return $ Cont_float_txt algnt txt
 evalCont (Cont_empty) = return Cont_empty
 
 
@@ -485,19 +554,19 @@ evalCont (Cont_empty) = return Cont_empty
 lookForVar :: (MonadError Error m, MonadState Env m) => Variable -> m EvalVType
 lookForVar v = do varEnv <- gets var
                   lookFor' varEnv
-    where lookFor' []          = throwError (UndefVar v)
+    where lookFor' []          = throwErrorFile (UndefVar v)
           lookFor' ((v',e):xs) | v == v'   = either error return e
                                | otherwise = lookFor' xs
-          error = \_ -> throwError (ExpectedVar v)
+          error = \_ -> throwErrorFile (ExpectedVar v)
 
 
 
 lookForOp :: (MonadError Error m, MonadState Env m) => Variable -> m ([Variable],VType)
 lookForOp v = do varEnv <- gets var
                  lookFor' varEnv
-    where lookFor' []          = throwError (UndefVar v)
+    where lookFor' []          = throwErrorFile (UndefVar v)
           lookFor' ((v',e):xs) | v == v'   = either return error e
                                | otherwise = lookFor' xs
-          error = \_ -> throwError (ExpectedOp v)
+          error = \_ -> throwErrorFile (ExpectedOp v)
 
 
