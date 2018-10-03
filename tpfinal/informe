@@ -1,16 +1,17 @@
 
 \include{header}
 
+\text_default{courier}{12}
 
 
 ######################### Caratula ########################
 
 \def{logoUnr}{\set_cont{\rect{90mm,240mm,120mm,270mm}{0mm,0mm}}{\image{UNR_logo.jpg}}}
 
-\def{textUnr}{\float{justify}{Facultad de Ciencias Exactas, Ingenieria y Agrimensura}}
+\def{textUnr}{\float{justify}{Facultad de Ciencias Exactas, Ingeniería y Agrimensura}}
 \def{textUnrRect}{\set_cont{\rect{0mm,230mm,210mm,240mm}{36mm,1mm}}{$textUnr}}
 
-\def{textLcc}{\float{justify}{Licenciatura en Ciencias de la Computacion}}
+\def{textLcc}{\float{justify}{Licenciatura en Ciencias de la Computación}}
 \def{textLccRect}{\set_cont{\rect{0mm,225mm,210mm,235mm}{50mm,1mm}}{$textLcc}}
 
 \def{logoH}{\set_cont{\rect{70mm,160mm,140mm,230mm}{0mm,0mm}}{\image{haskell.jpg}}}
@@ -23,7 +24,7 @@
 
 \line_space{15}
 
-\s{24}{\b{Trabajo Practico Final \nl Analisis de Lenguajes de Programacion}}
+\s{24}{\b{Trabajo Práctico Final \nl Análisis de Lenguajes de Programación}}
 \nl
 \line_space{120}
 \s{16}{Bruno Sotelo}
@@ -50,31 +51,168 @@
 
 \new_page
 
-\line_space{20}
-
-\title{{Descripcion del lenguaje}}
-\line_space{7}
-En este trabajo practico se implemento un programa que permite crear PDFs con
+\title{{Descripción del lenguaje}}
+En este trabajo práctico se implementó un programa que permite crear PDFs con
 un lenguaje simple. Este lenguaje posee un estilo de sintaxis similar a Latex,
 las operaciones comienzan con una barra (\\) y sus argumentos se dan entre llaves,
 mientras el cuerpo del documento se escribe libremente. \nl
-Para controlar la forma del documento, se utilizan rectangulos que pueden contener
-texto o imagenes JPEG. Estos rectangulos, ademas de los tamaños de pagina y otras
-caracteristicas, se manejan a partir de sentencias del lenguaje. Antes de
+Para controlar la forma del documento, se utilizan rectángulos que pueden contener
+texto o imágenes JPEG. Estos rectángulos, además de los tamaños de página y otras
+características, se manejan a partir de sentencias del lenguaje. Antes de
 describirlas, algunas cosas a tener en cuenta: Se diferencian dos tipos de texto,
 uno es el cuerpo del documento, el cual se escribe libremente, exceptuando los
-caracteres \\, \{, \} y \$ que deben ser antecedidos por '\\', ya que estan
+caracteres \\, \{, \} y \$ que deben ser antecedidos por '\\', ya que están
 reservados para operaciones y variables; este texto se escribe secuencialmente en
-todos los rectangulos con contenido 'body', en el orden en que estos fueron dados
-(es decir, si no entra en uno, se sigue escribiendo en el proximo rectangulo).
-El otro tipo de texto es el 'texto flotante', que solo puede ocupar el rectangulo
-en donde fue insertado, todo el texto que no entre en el sera perdido; y no puede
+todos los rectángulos con contenido 'body', en el orden en que estos fueron dados
+(es decir, si no entra en uno, se sigue escribiendo en el próximo rectángulo).
+El otro tipo de texto es el 'texto flotante', que sólo puede ocupar el rectángulo
+en donde fue insertado, todo el texto que no entre en él será perdido; y no puede
 recibir modificaciones, es escrito siguiendo la fuente predeterminada. \nl
-Tambien se diferencian dos tipos de paginas, aquellas creadas manualmente a partir
-de alguna de las dos sentencias new_page, y aquellas creadas automaticamente por
-el programa; estas ultimas aparecen cuando no queda mas espacio en las 'paginas
-manuales' para escribir el texto del cuerpo, y son creadas con el patron
-predeterminado, que puede ser modificado.
+También se diferencian dos tipos de páginas, aquellas creadas manualmente a partir
+de alguna de las dos sentencias new_page, y aquellas creadas automáticamente por
+el programa; estas últimas aparecen cuando no queda más espacio en las 'páginas
+manuales' para escribir el texto del cuerpo, y son creadas con el patrón
+predeterminado, que puede ser modificado. \nl
+
+\subtitle{{Sentencias}}
+El lenguaje se compone de unas pocas sentencias que son: \nl
+\b{def:} Con la cual pueden definirse variables y operaciones. Su sintaxis es
+        \b{\\def\{var/op\}[args]\{definicion\}}. Para tratarse como operación
+        se debe dar al menos un argumento (como un nombre de variable), de lo
+        contrario puede no escribirse ninguno o directamente omitir las llaves.
+        Las variables definidas pueden utilizarse antecediéndolas con \$, y las
+        operaciones tienen sixtaxis \\op\{\{arg1\},\{arg2\},...\} (las comas
+        para separar argumentos no serían suficientes, dado que pueden ser parte
+        del texto que se da como argumento). \nl
+\b{new_page:} Crea una nueva página 'manual', y tiene dos formas, una sin
+        argumentos, la cual crea la página siguiendo el estilo de la página
+        predeterminada; y la otra recibe como argumentos el tamaño de la página
+        y los rectángulos que contiene. La sintaxis de esta última es
+        \i{\\new_page\{exp l1, exp l2\}\{exp r1, exp r2, ...\}}, donde \i{lx} es
+        una longitud (un número seguido de mm, in o px) y \i{rx} es un rectángulo.
+        Donde se indica \i{exp,} pueden recibirse valores, variables y operaciones
+        que evaluen al tipo esperado. \nl
+\b{page_default:} Fija la página predeterminada. Su sintaxis es igual a la de
+        new_page con parámetros. \nl
+\b{set_ppi:} Fija la cantidad de pixeles por pulgada. Afecta al documento desde
+        que se utiliza, si antes se usaron longitudes con \i{mm} o \i{in}, estas
+        usarán el ppi anterior. \nl
+\b{text_default:} Establece la fuente por defecto. Recibe como argumentos
+        el nombre de la fuente (\i{helvetica,} \i{times_roman} o
+        \i{courier}) y el tamaño. \nl
+\b{add:} Toma como argumentos una cantidad arbitraria de expresiones réctangulo,
+        separadas por coma, y los añade a la última página creada manualmente. Si no
+        hay, crea una con el tamaño por defecto. \nl
+\b{line_space:} Recibe una expresión tipo entero, y añade esa cantidad de espacio
+        entre líneas a todo el texto que la sigue. Con \i{\\line_space\{0\}} se vuelve
+        al espacio predeterminado. \nl
+\b{debug:} Empieza un modo de 'depuración' a partir de donde se utiliza. Un efecto
+        es marcar todos los rectángulos utilizados, delineando sus bordes (internos y
+        externos). El otro, que depende del visor de PDFs utilizado, es dejar comentarios
+        en los rectángulos que se utilizan como variables u operaciones (se comenta el
+        nombre de la variable o de la operación). \nl
+\b{include:} Permite incluir otro archivo, es decir, a partir de utilizar include,
+        se pueden utilizar todas las variables y funciones que estén definidas allí,
+        y si posee texto (cuerpo de documento), aquel también será incluido en el
+        texto del archivo que incluye. Se puede decir que escribir include es igual
+        a copiar y pegar el archivo incluido en el lugar.
+
+\subtitle{{Modificadores de texto}}
+El cuerpo del documento puede modificarse con algunas operaciones. Estas toman como
+argumento (también entre llaves) el texto a modificar, aunque también pueden
+insertarse las sentencias vistas o más modificadores. Estos son: \nl
+\b{b} para negrita (bold). \nl
+\b{i} para italica u oblicua. \nl
+\b{s} cambia el tamaño del texto (recibe antes otro argumento de tipo entero).\nl
+\b{f} cambia la fuente del texto (recibe antes el nombre de la fuente). \nl
+\b{nl} inserta un salto de línea. \nl
+También hay que tener en cuenta que las sentencias new_page sirven como un salto
+de página al utilizarlo en medio del cuerpo del documento. \nl
+
+\subtitle{{Los rectángulos}}
+Un rectángulo se crea con la operación \b{rect,} que tiene como argumentos cuatro
+longitudes para establecer su posición (las dos primeras indican el punto inferior
+izquierdo, las otras dos el punto superior derecho) separadas por coma, y otras
+dos longitudes para indicar los margenes (la primera inferior y superior, y la otra
+derecha e izquierda). La sintaxis es entonces \b{\\rect\{x1,y1,x2,y2\}\{my,mx\}}.
+Un rectángulo puede tener cuatro tipos de contenido: el cuerpo del texto, texto
+'flotante' (descrito anteriormente), una imagen JPEG, o nada. Un rectángulo contiene
+por defecto el cuerpo del texto. El contenido se crea usando las siguientes
+operaciones: \nl
+\b{image:} Crea contenido de imagen, tomando como argumento la dirección del
+        archivo. \nl
+\b{body:} Para que el rectángulo contenga el cuerpo del documento. Recibe un
+        argumento de alineación (justify, flush_left, flush_right o center). \nl
+\b{float:} Crea texto flotante. Recibe también la alineación a usar, y el texto,
+        que no puede recibir modificaciones. El único caracter prohibido es '\}',
+        aunque puede insertarse antecediéndolo con '\\'. \nl
+\b{empty:} Para dejar el rectángulo sin contenido. \nl
+Para cambiar las características de un rectángulo, como el contenido, se proveen
+cuatro modificadores. Todos toman como primer argumento una expresión de tipo
+rectángulo, realizan alguna acción, y devuelven un nuevo rectángulo modificado.
+Estos son: \nl
+\b{set_cont} que recibe también una expresión de tipo contenido, y lo establece
+        como contenido del nuevo rectángulo. \nl
+\b{in_frame, out_frame} delinean los bordes del nuevo rectángulo, según el
+        segundo argumento, que puede ser cualquier subconjunto de los caracteres
+        'u' (up), 'd' (down), 'l' (left) y 'r' (right), separados cada uno por coma.
+        in_frame delinea los bordes internos y out_frame los externos (con
+        borde interno se entiende el afectado por los márgenes dados). \nl
+\b{clean} es un atajo para \\set_cont\{\$rectangulo\}\{\\empty\}. \nl
+
+\subtitle{{Sobre las variables}}
+Las variables pueden tomar 5 tipos de valor: una o dos longitudes separadas por coma
+(que son numeros seguidos por mm (milimetros), in (pulgadas) o px (pixeles)),
+rectangulos, contenido, enteros, y un conjunto de sentencias y texto, es decir,
+puede ser un documento en sí. Las variables se comportan como lo hacen en los
+lenguajes imperativos, pueden redefinirse (el valor anterior se elimina), y pueden
+utilizarse en su nueva definición, por ejemplo: \nl
+\b{\\def\{rectangle\}\{\\clean\{\$rectangle\}\}} \nl
+Redefine \b{rectangle} con las mismas características que tenía, pero sin contenido.
+
+\new_page
+
+\title{{Descripción de la implementación}}
+La implementación del programa se basa en la librería \b{HPDF}
+(hackage.haskell.org/package/HPDF-1.4.10). En primer lugar se escribieron Types.hs
+y Run.hs como interfaz para simplificar la escritura del PDF en sí, ya pensando en
+la forma que tendría el lenguaje. En Run se encuentra el conjunto de funciones que
+posiciona y escribe el texto e imágenes, más algunas otras que permiten separar el
+texto en líneas y acomodar el espacio entre ellas. \nl
+Luego se encuentran Parser.hs y AST.hs. En AST encontramos el árbol de sintaxis
+abstracta del lenguaje, que el Parser genera al procesar el texto. El Parser fue
+hecho con Parsec. \nl
+Para traducir el lenguaje abstracto a algo que acepte Run para dibujar, existe
+Eval.hs. En Eval nos encontramos la definición de los errores y del entorno que
+se utilizarán durante la evaluación, y la función de evaluación en sí, \b{eval}.
+Esta función recibe el nombre del archivo a evaluar y el conjunto de sentencias y
+texto que fue obtenido de este, y devuelve o bien un error o bien el documento
+que se debe escribir más la forma de página a usar por defecto, con tipos que
+acepta la función de Run. Hay varias funciones de evaluación de expresiones, por
+cada tipo de expresión encontramos la que puede evaluar un valor y la que puede
+evaluar una expresión del tipo requerido. \b{evalStmt} evalua las sentencias y
+el cuerpo del documento, junto con \b{evalDoc'} que distingue el caso de Include.
+Desde evalDoc' hacia abajo las funciones parametrizan la mónada de evaluación,
+restringiéndola a las clases \b{MonadState} y \b{MonadError}, que proveen una
+buena interfaz de acceso a entorno (get, gets, put, modify, etc.), y de
+manejo de errores (throwError, catchError). En \b{evalDoc} se establece la
+mónada a utilizar, que es \b{StateT Env (Either Error)}. \nl
+Finalmente tenemos Main.hs, que provee la interfaz del programa y la unión
+de las diferentes partes. También fue necesario trasladar la lectura de
+imágenes a Main por el uso de la mónada IO, para lo cual se encuentra
+\b{OpenImages}. \nl
+La interfaz del programa es la siguiente: \nl
+\b{main [file][-h][-o out][-d]} \nl
+Donde 'file' es el archivo a evaluar, '-h' imprime un mensaje de ayuda, '-o out'
+indica que la salida (el PDF) debe llamarse 'out', y '-d' indica el modo debug
+(es lo mismo que escribir la sentencia '\\debug' al principio de 'file'). \nl
+Este informe fue escrito como prueba del programa, su código fuente puede
+verse en el archivo \b{informe}, que se complementa con algunas definiciones
+de \b{header}, y puede evaluarse con \b{main informe}.
+
+
+
+
 
 
 

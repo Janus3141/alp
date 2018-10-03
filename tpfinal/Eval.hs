@@ -13,6 +13,7 @@ import AST
 import Types
 import Graphics.PDF
 import Parser
+import System.IO
 
 ------------------------------------------------------------------------------
 --------------------------------- Utilidades ---------------------------------
@@ -277,7 +278,9 @@ eval' e d = do rem <- return $ evalDoc e d
 -- devolvera Right ([],e), por lo tanto se omite Doc.
 
 incldHandler :: Env -> FilePath -> IO (Either Error Env)
-incldHandler env f = do cont <- readFile f
+incldHandler env f = do handle <- openFile f ReadMode
+                        hSetEncoding handle utf8
+                        cont <- hGetContents handle
                         cont' <- return $ parseDoc cont
                         either failure evaluate cont'
     where evaluate d = do result <- eval' (env {file = f}) d

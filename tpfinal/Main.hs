@@ -10,6 +10,7 @@ import Eval
 import Run
 import Types
 import AST
+import System.IO
 
 
 ------------------------------------------------------------------------------
@@ -80,7 +81,9 @@ main = do args <- getArgs
           args' <- argParse initArgs args
           if argFile args' == "" then exitSuccess
                                  else return ()
-          content <- readFile (argFile args')
+          handle <- openFile (argFile args') ReadMode
+          hSetEncoding handle utf8
+          content <- hGetContents handle
           parseResult <- return $ parseDoc content
           either print (evaluate args') parseResult
 
