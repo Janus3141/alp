@@ -484,23 +484,29 @@ evalExpRect :: (MonadError Error m, MonadState Env m) => Exp ParserRect -> m Eva
 evalExpRect (Var v) = do
         val <- lookForVar v
         case val of
-           EVRect r -> maybeDebug v r
+           EVRect r -> maybeDebug (Just v) r
            _        -> throwErrorFile (ExpectedEType "rectangulo" val)
 evalExpRect (Op op args) = do
         vvt <- lookForOp op
         case snd vvt of
            VRect _ -> do EVRect r <- exec vvt args
-                         maybeDebug ("\\" ++ op) r
+                         maybeDebug (Just $ "\\" ++ op) r
            _       -> throwErrorFile (ExpectedVType "rectangulo" $ snd vvt)
 evalExpRect (Value v) = evalRect v
 
 
 
-maybeDebug :: (MonadError Error m, MonadState Env m) => String -> EvalRect -> m EvalRect
-maybeDebug msg (Rect p m e c _) = do
-        d <- gets debug
-        if d then return (Rect p m e c (Just msg))
-             else return (Rect p m e c Nothing)
+-- Activa los efectos de Debug. El primer argumento es el comentario a escribir sobre
+-- el rectangulo. Recibir Nothing indica que se debe dejar el comentario anterior.
+-- Recibir Just x indica que, si Debug esta activo, se debe escribir el comentario x.
+maybeDebug :: (MonadError Error m, MonadState Env m) => Maybe String -> EvalRect -> m EvalRect
+maybeDebug msg (Rect p m e c d) = do
+        let full = (True,True,True,True)
+        dbg <- gets debug
+        if dbg then case msg of
+                    Just msg' -> return (Rect p m (full,full) c (Just msg'))
+                    Nothing   -> return (Rect p m (full,full) c d)
+               else return (Rect p m e c Nothing)
 
 
 
@@ -510,16 +516,16 @@ evalRect (ParserRect (p1,p2) mrgns) = do
         p1' <- liftM toPoint $ evalExpLPair p1
         p2' <- liftM toPoint $ evalExpLPair p2
         mrgns' <- evalExpLPair mrgns
-        return $ Rect (p1',p2') mrgns' (hid,hid) (Cont_body Justified) Nothing
+        maybeDebug Nothing $ Rect (p1',p2') mrgns' (hid,hid) (Cont_body Justified) Nothing
 evalRect (Clean r) = do (Rect p m e _ d) <- evalExpRect r
-                        return $ Rect p m e Cont_empty d
+                        maybeDebug Nothing $ Rect p m e Cont_empty d
 evalRect (In_frame r e) = do (Rect p m (ext,_) c d) <- evalExpRect r
-                             return $ Rect p m (ext, toEdges e) c d
+                             maybeDebug Nothing $ Rect p m (ext, toEdges e) c d
 evalRect (Out_frame r e) = do (Rect p m (_,int) c d) <- evalExpRect r
-                              return $ Rect p m (toEdges e, int) c d
+                              maybeDebug Nothing $ Rect p m (toEdges e, int) c d
 evalRect (Rect_set r c) = do (Rect p m e _ d) <- evalExpRect r
                              c' <- evalExpCont c
-                             return $ Rect p m e c' d
+                             maybeDebug Nothing $ Rect p m e c' d
 
 
 

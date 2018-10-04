@@ -8,16 +8,16 @@
 
 \def{logoUnr}{\set_cont{\rect{90mm,240mm,120mm,270mm}{0mm,0mm}}{\image{UNR_logo.jpg}}}
 
-\def{textUnr}{\float{justify}{Facultad de Ciencias Exactas, Ingeniería y Agrimensura}}
-\def{textUnrRect}{\set_cont{\rect{0mm,230mm,210mm,240mm}{36mm,1mm}}{$textUnr}}
+\def{textUnr}{\float{center}{Facultad de Ciencias Exactas, Ingeniería y Agrimensura}}
+\def{textUnrRect}{\set_cont{\rect{0mm,230mm,210mm,240mm}{1mm,1mm}}{$textUnr}}
 
-\def{textLcc}{\float{justify}{Licenciatura en Ciencias de la Computación}}
-\def{textLccRect}{\set_cont{\rect{0mm,225mm,210mm,235mm}{50mm,1mm}}{$textLcc}}
+\def{textLcc}{\float{center}{Licenciatura en Ciencias de la Computación}}
+\def{textLccRect}{\set_cont{\rect{0mm,225mm,210mm,235mm}{1mm,1mm}}{$textLcc}}
 
 \def{logoH}{\set_cont{\rect{70mm,160mm,140mm,230mm}{0mm,0mm}}{\image{haskell.jpg}}}
 
 
-\def{textTitle}{\set_cont{\rect{0mm,20mm,210mm,160mm}{10mm,1mm}}{\body{center}}}
+\def{textTitle}{\set_cont{\rect{0mm,20mm,210mm,160mm}{0mm,0mm}}{\body{center}}}
 
 
 \new_page{$a4}{$logoUnr, $textUnrRect, $textLccRect, $logoH, $textTitle}
@@ -36,12 +36,12 @@
 ########################## Seteo cuerpo ########################
 
 \def{encabezadoI}{\float{flush_left}{Bruno Sotelo}}
-\def{encabezadoI}{\set_cont{\rect{0mm,277mm,210mm,282mm}{20mm,0mm}}{$encabezadoI}}
+\def{encabezadoI}{\set_cont{\rect{0mm,277mm,105mm,283mm}{18mm,0mm}}{$encabezadoI}}
 
-\def{encabezadoD}{\float{flush_right}{Trabajo Practico Final}}
-\def{encabezadoD}{\set_cont{\rect{0mm,277mm,210mm,282mm}{20mm,0mm}}{$encabezadoD}}
+\def{encabezadoD}{\float{flush_right}{Trabajo Práctico Final}}
+\def{encabezadoD}{\set_cont{\rect{105mm,277mm,210mm,283mm}{18mm,0mm}}{$encabezadoD}}
 
-\def{mainRect}{\inner_frame{\rect{0mm,0mm,$a4}{20mm,20mm}}{u}}
+\def{mainRect}{\inner_frame{\rect{0mm,0mm,$a4}{18mm,20mm}}{u}}
 
 \page_default{$a4}{$mainRect, $encabezadoI, $encabezadoD}
 
@@ -77,7 +77,7 @@ predeterminado, que puede ser modificado. \nl
 \subtitle{{Sentencias}}
 El lenguaje se compone de unas pocas sentencias que son: \nl
 \b{def:} Con la cual pueden definirse variables y operaciones. Su sintaxis es
-        \b{\\def\{var/op\}[args]\{definicion\}}. Para tratarse como operación
+        \b{\\def\{var/op\}[args]\{definicion\}.} Para tratarse como operación
         se debe dar al menos un argumento (como un nombre de variable), de lo
         contrario puede no escribirse ninguno o directamente omitir las llaves.
         Las variables definidas pueden utilizarse antecediéndolas con \$, y las
@@ -88,9 +88,9 @@ El lenguaje se compone de unas pocas sentencias que son: \nl
         argumentos, la cual crea la página siguiendo el estilo de la página
         predeterminada; y la otra recibe como argumentos el tamaño de la página
         y los rectángulos que contiene. La sintaxis de esta última es
-        \i{\\new_page\{exp l1, exp l2\}\{exp r1, exp r2, ...\}}, donde \i{lx} es
-        una longitud (un número seguido de mm, in o px) y \i{rx} es un rectángulo.
-        Donde se indica \i{exp,} pueden recibirse valores, variables y operaciones
+        \b{\\new_page\{exp l1, exp l2\}\{exp r1, exp r2, ...\},} donde lx es
+        una longitud (un número seguido de mm, in o px) y rx es un rectángulo.
+        Donde se indica exp, pueden recibirse valores, variables y operaciones
         que evaluen al tipo esperado. \nl
 \b{page_default:} Fija la página predeterminada. Su sintaxis es igual a la de
         new_page con parámetros. \nl
@@ -98,13 +98,12 @@ El lenguaje se compone de unas pocas sentencias que son: \nl
         que se utiliza, si antes se usaron longitudes con \i{mm} o \i{in}, estas
         usarán el ppi anterior. \nl
 \b{text_default:} Establece la fuente por defecto. Recibe como argumentos
-        el nombre de la fuente (\i{helvetica,} \i{times_roman} o
-        \i{courier}) y el tamaño. \nl
+        el nombre de la fuente (helvetica, times_roman o courier) y el tamaño. \nl
 \b{add:} Toma como argumentos una cantidad arbitraria de expresiones réctangulo,
         separadas por coma, y los añade a la última página creada manualmente. Si no
         hay, crea una con el tamaño por defecto. \nl
 \b{line_space:} Recibe una expresión tipo entero, y añade esa cantidad de espacio
-        entre líneas a todo el texto que la sigue. Con \i{\\line_space\{0\}} se vuelve
+        entre líneas a todo el texto que la sigue. Con \\line_space\{0\} se vuelve
         al espacio predeterminado. \nl
 \b{debug:} Empieza un modo de 'depuración' a partir de donde se utiliza. Un efecto
         es marcar todos los rectángulos utilizados, delineando sus bordes (internos y
@@ -115,7 +114,7 @@ El lenguaje se compone de unas pocas sentencias que son: \nl
         se pueden utilizar todas las variables y funciones que estén definidas allí,
         y si posee texto (cuerpo de documento), aquel también será incluido en el
         texto del archivo que incluye. Se puede decir que escribir include es igual
-        a copiar y pegar el archivo incluido en el lugar.
+        a copiar y pegar el archivo incluido en el lugar. \nl
 
 \subtitle{{Modificadores de texto}}
 El cuerpo del documento puede modificarse con algunas operaciones. Estas toman como
@@ -134,7 +133,7 @@ Un rectángulo se crea con la operación \b{rect,} que tiene como argumentos cua
 longitudes para establecer su posición (las dos primeras indican el punto inferior
 izquierdo, las otras dos el punto superior derecho) separadas por coma, y otras
 dos longitudes para indicar los margenes (la primera inferior y superior, y la otra
-derecha e izquierda). La sintaxis es entonces \b{\\rect\{x1,y1,x2,y2\}\{my,mx\}}.
+derecha e izquierda). La sintaxis es entonces \b{\\rect\{x1,y1,x2,y2\}\{my,mx\}.}
 Un rectángulo puede tener cuatro tipos de contenido: el cuerpo del texto, texto
 'flotante' (descrito anteriormente), una imagen JPEG, o nada. Un rectángulo contiene
 por defecto el cuerpo del texto. El contenido se crea usando las siguientes
@@ -193,22 +192,22 @@ cada tipo de expresión encontramos la que puede evaluar un valor y la que puede
 evaluar una expresión del tipo requerido. \b{evalStmt} evalua las sentencias y
 el cuerpo del documento, junto con \b{evalDoc'} que distingue el caso de Include.
 Desde evalDoc' hacia abajo las funciones parametrizan la mónada de evaluación,
-restringiéndola a las clases \b{MonadState} y \b{MonadError}, que proveen una
+restringiéndola a las clases \b{MonadState} y \b{MonadError,} que proveen una
 buena interfaz de acceso a entorno (get, gets, put, modify, etc.), y de
 manejo de errores (throwError, catchError). En \b{evalDoc} se establece la
-mónada a utilizar, que es \b{StateT Env (Either Error)}. \nl
+mónada a utilizar, que es \b{StateT Env (Either Error).} \nl
 Finalmente tenemos Main.hs, que provee la interfaz del programa y la unión
 de las diferentes partes. También fue necesario trasladar la lectura de
 imágenes a Main por el uso de la mónada IO, para lo cual se encuentra
-\b{OpenImages}. \nl
+\b{OpenImages.} \nl
 La interfaz del programa es la siguiente: \nl
 \b{main [file][-h][-o out][-d]} \nl
 Donde 'file' es el archivo a evaluar, '-h' imprime un mensaje de ayuda, '-o out'
 indica que la salida (el PDF) debe llamarse 'out', y '-d' indica el modo debug
 (es lo mismo que escribir la sentencia '\\debug' al principio de 'file'). \nl
 Este informe fue escrito como prueba del programa, su código fuente puede
-verse en el archivo \b{informe}, que se complementa con algunas definiciones
-de \b{header}, y puede evaluarse con \b{main informe}.
+verse en el archivo \b{informe,} que se complementa con algunas definiciones
+de \b{header,} y puede evaluarse con \b{main informe.}
 
 
 

@@ -21,26 +21,13 @@ flushLeft _ _ _ _ = []
 
 
 flushRight :: AlignFunction
-flushRight f waste _ _ = [TextFont Helvetica, TextSize 1] ++
-                         [TextT prefixSpace] ++
-                         [TextFont fn, TextSize fs]
-    where PDFFont fn fs = f
-          minFont = PDFFont Helvetica 1
-          minSpaWdt = charWidth minFont ' '
-          spaceNum = round (waste / minSpaWdt)
-          prefixSpace = ' ' <$ [1..spaceNum]
+flushRight f waste _ _ = [TextWordSpa spa, TextT " ", TextWordSpa 0]
+    where spa = waste / 2 - textWidth f (toPDFString " ") / 4 * 3
 
 
 center :: AlignFunction
-center f waste _ _ = [TextFont Helvetica, TextSize 1] ++
-                         [TextT prefixSpace] ++
-                         [TextFont fn, TextSize fs]
-    where PDFFont fn fs = f
-          minFont = PDFFont Helvetica 1
-          minSpaWdt = charWidth minFont ' '
-          spaceNum = round (waste / minSpaWdt / 2)
-          prefixSpace = ' ' <$ [1..spaceNum]
-
+center f waste _ _ = [TextWordSpa spa, TextT " ", TextWordSpa 0]
+    where spa = waste / 4 - textWidth f (toPDFString " ") / 4 * 3
 
 
 

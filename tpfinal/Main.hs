@@ -90,7 +90,8 @@ main = do args <- getArgs
 
 evaluate :: CallArgs -> Doc -> IO ()
 evaluate args d = do
-        result <- eval (argFile args) d
+        let d' = if argDebug args then (Debug:d) else d
+        result <- eval (argFile args) d'
         (page,doc) <- either printExit return result
         (page',doc') <- liftM2 (,) (openImagesPage page) (openImages doc)
         pdf <- return $ drawPDF doc' page'

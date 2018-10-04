@@ -5,7 +5,7 @@
 \def{a3}{297mm,420mm}
 
 #### Un estilo para titulos
-\def{preSpace}{\line_space{20}}
+\def{preSpace}{\line_space{25}}
 \def{postSpace}{\line_space{9}}
 \def{title}[txt]{$preSpace \b{\s{24}{$txt}} \nl $postSpace}
 \def{subtitle}[txt]{$preSpace \s{20}{$txt} \nl $postSpace}
